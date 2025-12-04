@@ -1286,7 +1286,7 @@ export default function ChatPage() {
                     <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
                         <h3 className="text-lg font-semibold mb-4 dark:text-white">Translate Message</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                            "{selectedMessageForTranslation.text}"
+                            &quot;{selectedMessageForTranslation.text}&quot;
                         </p>
                         <div className="space-y-3">
                             <select
