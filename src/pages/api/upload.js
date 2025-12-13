@@ -49,7 +49,6 @@ export default async function handler(req, res) {
     return new Promise((resolve, reject) => {
       form.parse(req, async (err, fields, files) => {
         if (err) {
-          console.error('❌ File upload error:', err);
           reject(res.status(500).json({ error: 'File upload failed' }));
           return;
         }
@@ -60,14 +59,9 @@ export default async function handler(req, res) {
           return;
         }
 
-        // Debug logging to see file structure
-        console.log('File object:', JSON.stringify(file, null, 2));
-        console.log('File keys:', Object.keys(file));
-
         // In formidable v2, the file structure is more straightforward
         const filePath = file.filepath || file.path;
         if (!filePath) {
-          console.error('❌ No valid file path found in file object');
           reject(res.status(500).json({ error: 'Invalid file object - no file path' }));
           return;
         }
@@ -82,7 +76,6 @@ export default async function handler(req, res) {
           else if (mimetype.startsWith('audio/')) fileType = 'audio';
           else if (mimetype.startsWith('application/') || mimetype.startsWith('text/')) fileType = 'document';
         } catch (error) {
-          console.log('Error determining file type, using fallback:', error);
           // Fallback: try to determine type from file extension
           const ext = path.extname(file.originalFilename || '').toLowerCase();
           if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(ext)) fileType = 'image';
@@ -109,15 +102,11 @@ export default async function handler(req, res) {
             mimetype: mimetype
           }));
         } catch (moveError) {
-          console.error('❌ Error moving file:', moveError);
-          console.error('Source path:', filePath);
-          console.error('Destination path:', newPath);
           reject(res.status(500).json({ error: 'Failed to save file' }));
         }
       });
     });
   } catch (error) {
-    console.error('❌ Upload handler error:', error);
     return res.status(500).json({ error: 'Server error during upload' });
   }
 }

@@ -21,9 +21,6 @@ export default function CallButton({ conversationId, otherUser, user, pusherRef,
     <>
       <button
         onClick={() => {
-          console.log("📞 CallButton: Opening call modal for conversation:", conversationId);
-          console.log("📞 CallButton: Other user:", otherUser);
-          console.log("📞 CallButton: Current user:", localUser);
           setOpen(true);
           // Notify parent that outgoing call is being initiated
           onOutgoingCall?.(true);

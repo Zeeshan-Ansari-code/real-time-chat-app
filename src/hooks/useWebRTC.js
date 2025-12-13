@@ -1,0 +1,230 @@
+import { useRef } from "react";
+import axios from "axios";
+
+const CONFIG = {
+  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+};
+
+export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
+  const pcRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const pendingCandidatesRef = useRef([]);
+
+  const videoUtils = {
+    async playVideo(videoElement, streamType) {
+      if (!videoElement || !videoElement.srcObject) return false;
+      try {
+        await videoElement.play();
+        return true;
+      } catch (error) {
+        return false;
+      }
+    },
+
+    setupVideoElement(videoElement, stream, streamType) {
+      if (!videoElement || !stream) return;
+
+      videoElement.srcObject = stream;
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.muted = streamType === "Local";
+      
+      videoElement.onloadedmetadata = null;
+      videoElement.oncanplay = null;
+      videoElement.onplaying = null;
+      videoElement.onerror = null;
+
+      videoElement.onloadedmetadata = () => {
+        if (!videoElement || !videoElement.srcObject) return;
+        if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+          videoUtils.playVideo(videoElement, streamType);
+        }
+      };
+
+      videoElement.oncanplay = () => {
+        if (!videoElement || !videoElement.srcObject) return;
+        videoUtils.playVideo(videoElement, streamType);
+      };
+
+      videoElement.onplaying = () => {
+        if (!videoElement || !videoElement.srcObject) return;
+      };
+
+      videoElement.onerror = () => {};
+    }
+  };
+
+  async function startLocalStream() {
+    if (localStreamRef.current) return localStreamRef.current;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          frameRate: { ideal: 30, min: 15 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: { ideal: 48000, min: 22050 }
+        }
+      });
+
+      localStreamRef.current = stream;
+      return stream;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  function cleanup(localVideoRef, remoteVideoRef) {
+    try {
+      if (localVideoRef?.current) {
+        localVideoRef.current.onloadedmetadata = null;
+        localVideoRef.current.oncanplay = null;
+        localVideoRef.current.onplaying = null;
+        localVideoRef.current.onerror = null;
+        localVideoRef.current.srcObject = null;
+      }
+       
+      if (remoteVideoRef?.current) {
+        remoteVideoRef.current.onloadedmetadata = null;
+        remoteVideoRef.current.oncanplay = null;
+        remoteVideoRef.current.onplaying = null;
+        remoteVideoRef.current.onerror = null;
+        remoteVideoRef.current.srcObject = null;
+      }
+       
+      if (pcRef.current?.rtc) {
+        pcRef.current.rtc.close();
+      }
+      
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      
+      if (window.currentRemoteStream) {
+        window.currentRemoteStream = null;
+      }
+    } catch (error) {}
+    
+    pcRef.current = null;
+    localStreamRef.current = null;
+    pendingCandidatesRef.current = [];
+  }
+
+  async function createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, onRemoteStream, setStatus) {
+    try {
+      const rtc = new RTCPeerConnection(CONFIG);
+
+      rtc.onconnectionstatechange = () => {
+        if (rtc.connectionState === 'connected') {
+          if (setStatus) {
+            setStatus("in-call");
+          }
+        } else if (rtc.connectionState === 'failed') {
+          cleanup(localVideoRef, remoteVideoRef);
+        } else if (rtc.connectionState === 'connecting') {
+          if (setStatus) setStatus("connecting");
+        }
+      };
+
+      rtc.onsignalingstatechange = () => {};
+      rtc.oniceconnectionstatechange = () => {};
+
+      const localStream = await startLocalStream();
+      const tracks = localStream.getTracks();
+
+      tracks.forEach((track) => {
+        try {
+          rtc.addTrack(track, localStream);
+        } catch (error) {}
+      });
+
+      if (localVideoRef?.current) {
+        videoUtils.setupVideoElement(localVideoRef.current, localStream, "Local");
+      }
+
+      let remoteStream = null;
+
+      rtc.ontrack = (evt) => {
+        if (!remoteStream) {
+          remoteStream = new MediaStream();
+        }
+         
+        const existingTrack = remoteStream.getTracks().find(t => t.id === evt.track.id);
+        if (existingTrack) {
+          return;
+        }
+         
+        remoteStream.addTrack(evt.track);
+        window.currentRemoteStream = remoteStream;
+
+        if (remoteVideoRef?.current) {
+          remoteVideoRef.current.srcObject = remoteStream;
+          remoteVideoRef.current.autoplay = true;
+          remoteVideoRef.current.playsInline = true;
+          remoteVideoRef.current.muted = false;
+           
+          remoteVideoRef.current.onloadedmetadata = () => {
+            if (!remoteVideoRef.current) return;
+            if (remoteVideoRef.current.videoWidth > 0 && remoteVideoRef.current.videoHeight > 0) {
+              remoteVideoRef.current.play().catch(e => {});
+            }
+          };
+           
+          remoteVideoRef.current.oncanplay = () => {
+            if (!remoteVideoRef.current) return;
+          };
+           
+          remoteVideoRef.current.onplaying = () => {
+            if (!remoteVideoRef.current) return;
+          };
+           
+          remoteVideoRef.current.onerror = () => {
+            if (!remoteVideoRef.current) return;
+          };
+           
+          setTimeout(() => {
+            if (remoteVideoRef.current && remoteVideoRef.current.srcObject) {
+              remoteVideoRef.current.play().catch(e => {});
+            }
+          }, 100);
+        }
+
+        if (onRemoteStream) {
+          onRemoteStream(remoteStream);
+        }
+      };
+
+      rtc.onicecandidate = (evt) => {
+        if (evt.candidate) {
+          axios.post("/api/calls/candidate", {
+            conversationId,
+            from: user,
+            to: otherUser,
+            candidate: evt.candidate,
+          }).catch((err) => {});
+        }
+      };
+
+      pcRef.current = { ...pcRef.current, rtc };
+      return rtc;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  return {
+    pcRef,
+    localStreamRef,
+    pendingCandidatesRef,
+    videoUtils,
+    startLocalStream,
+    cleanup,
+    createPeerConnectionAndAttach
+  };
+}
+

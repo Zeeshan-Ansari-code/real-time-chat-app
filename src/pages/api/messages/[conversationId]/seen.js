@@ -25,7 +25,6 @@ export default async function handler(req, res) {
 
       res.status(200).json({ success: true, updated: updated.modifiedCount });
     } catch (err) {
-      console.error("Seen API error:", err);
       res.status(500).json({ error: "Server error" });
     }
   } else {

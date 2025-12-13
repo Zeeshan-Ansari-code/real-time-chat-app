@@ -15,7 +15,6 @@ export default async function handler(req, res) {
   try {
     await connectDB();
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
     return res.status(500).json({ error: "DB connection failed" });
   }
 
@@ -28,7 +27,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json(messages);
     } catch (err) {
-      console.error("❌ Error fetching messages:", err);
       return res.status(500).json({ error: "Server error while fetching messages" });
     }
   }
@@ -72,7 +70,6 @@ export default async function handler(req, res) {
 
       return res.status(201).json(newMessage);
     } catch (err) {
-      console.error("❌ Error creating message:", err);
       return res.status(500).json({ error: "Server error while creating message" });
     }
   }
@@ -94,7 +91,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error("❌ Error marking seen:", err);
       return res.status(500).json({ error: "Server error while marking seen" });
     }
   }

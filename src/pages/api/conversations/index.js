@@ -1,7 +1,9 @@
 import { connectDB } from "@/lib/mongoose";
 import Conversation from "@/models/Conversation";
+import Archive from "@/models/Archive";
 import User from "@/models/User";
 import Message from "@/models/Message";
+import mongoose from "mongoose";
 
 export default async function handler(req, res) {
   if (req.method === "GET") {
@@ -13,11 +15,50 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "userId is required" });
       }
 
-      const conversations = await Conversation.find({
-        participants: userId,
-      })
-        .populate("participants", "name email")
-        .lean();
+      // Convert userId to ObjectId for proper query
+      const userIdObj = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId;
+
+      const { includeArchived } = req.query;
+      
+      let conversations;
+      
+      if (includeArchived === "true") {
+        // Get archived conversations: Find all Archive documents for this user, then get the conversations
+        const archives = await Archive.find({ user: userIdObj })
+          .select("conversation")
+          .lean();
+        
+        const archivedConversationIds = archives.map(a => a.conversation);
+        
+        if (archivedConversationIds.length === 0) {
+          conversations = [];
+        } else {
+          conversations = await Conversation.find({
+            _id: { $in: archivedConversationIds },
+            participants: userIdObj
+          })
+            .populate("participants", "name email")
+            .lean();
+        }
+      } else {
+        // Get non-archived conversations: Get all conversations for user, exclude archived ones
+        const archives = await Archive.find({ user: userIdObj })
+          .select("conversation")
+          .lean();
+        
+        const archivedConversationIds = archives.map(a => a.conversation);
+        
+        const query = { participants: userIdObj };
+        if (archivedConversationIds.length > 0) {
+          query._id = { $nin: archivedConversationIds };
+        }
+        
+        conversations = await Conversation.find(query)
+          .populate("participants", "name email")
+          .lean();
+      }
 
       const decorated = await Promise.all(
         conversations.map(async (conv) => {
@@ -42,7 +83,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json(decorated);
     } catch (err) {
-      console.error(err);
       return res.status(500).json({ error: "Server error" });
     }
   }
@@ -65,7 +105,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ conversationId: conv._id });
     } catch (err) {
-      console.error(err);
       return res.status(500).json({ error: "Server error" });
     }
   }

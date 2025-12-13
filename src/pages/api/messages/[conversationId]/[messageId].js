@@ -14,7 +14,6 @@ export default async function handler(req, res) {
   try {
     await connectDB();
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
     return res.status(500).json({ error: "DB connection failed" });
   }
 
@@ -45,7 +44,6 @@ export default async function handler(req, res) {
 
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error("❌ Error deleting message:", err);
       return res.status(500).json({ error: "Server error while deleting message" });
     }
   }
