@@ -395,8 +395,6 @@ export default function ChatPage() {
 
     const loadMessages = async (convId) => {
         setIsLoadingMessages(true);
-        setSelectedConv(convId);
-        selectedConvRef.current = convId;
         try {
             const res = await axios.get(`/api/messages/${convId}`);
             setMessages(res.data);
@@ -528,6 +526,8 @@ export default function ChatPage() {
                 } catch (_) {}
                 setSearchQuery("");
                 setSearchResults([]);
+                setSelectedConv(convId);
+                selectedConvRef.current = convId;
                 await loadMessages(convId);
             }
         } catch (_) {}
@@ -550,11 +550,13 @@ export default function ChatPage() {
         });
     };
 
-    const handleSelectConversation = async (convId) => {
-        await loadMessages(convId);
+    const handleSelectConversation = (convId) => {
+        setSelectedConv(convId);
+        selectedConvRef.current = convId;
         if (isMobile) {
             setShowSidebar(false);
         }
+        loadMessages(convId);
     };
 
     const handleBackToList = () => {
