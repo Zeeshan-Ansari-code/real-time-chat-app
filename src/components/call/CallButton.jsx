@@ -22,11 +22,10 @@ export default function CallButton({ conversationId, otherUser, user, pusherRef,
       <button
         onClick={() => {
           setOpen(true);
-          // Notify parent that outgoing call is being initiated
           onOutgoingCall?.(true);
         }}
         title="Start Video Call"
-        className="p-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 hover:rotate-12"
+        className="p-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 hover:rotate-12"
       >
         <Video size={20} />
       </button>

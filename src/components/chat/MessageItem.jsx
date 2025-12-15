@@ -29,7 +29,7 @@ export default function MessageItem({
           isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''
         } ${
           isOwnMessage
-            ? "ml-auto bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+            ? "ml-auto bg-gradient-to-r from-blue-500 to-blue-600 text-white"
             : "mr-auto bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700"
         }`}
         onClick={(e) => {

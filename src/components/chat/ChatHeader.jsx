@@ -76,52 +76,50 @@ export default function ChatHeader({
   }, [searchQuery]); // Only depend on searchQuery, use ref for messages
 
   return (
-    <div className="p-4 lg:p-6 border-b dark:border-gray-700 bg-gradient-to-r from-white to-blue-50 dark:from-gray-900 dark:to-blue-900/20">
-      <div className="flex justify-between items-center gap-4">
+    <div className="p-5 lg:p-6 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-white via-blue-50/40 to-blue-100/40 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 shadow-sm">
+      <div className="flex justify-between items-start gap-4">
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-gray-800 dark:text-white text-lg lg:text-xl truncate">
-            {otherUserName || "Unknown User"}
-          </h2>
-          <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <span className="text-xs text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">Translate to:</span>
-            <select
-              value={recvLang}
-              onChange={(e) => onRecvLangChange(e.target.value)}
-              className="text-sm border dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200 min-w-0"
-            >
-              <option value="">Auto</option>
-              <option value="en">English</option>
-              <option value="hi">Hindi</option>
-              <option value="es">Spanish</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-            </select>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="font-bold text-gray-900 dark:text-white text-xl lg:text-2xl truncate">
+              {otherUserName || "Unknown User"}
+            </h2>
+            <div className={`w-2.5 h-2.5 rounded-full ${isOtherOnline ? 'bg-green-500' : 'bg-gray-400'} shadow-sm`}></div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Translate to:</span>
+              <select
+                value={recvLang}
+                onChange={(e) => onRecvLangChange(e.target.value)}
+                className="text-xs border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
+              >
+                <option value="">Auto</option>
+                <option value="en">English</option>
+                <option value="hi">Hindi</option>
+                <option value="es">Spanish</option>
+                <option value="fr">French</option>
+                <option value="de">German</option>
+              </select>
+            </div>
             {isTranslating && (
-              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
+              <span className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <div className="w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
                 Translating...
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400 font-medium flex items-center gap-2">
-            {typingUsers.length > 0 ? (
-              <>
-                <span className="flex space-x-1">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
-                </span>
-                {typingUsers.join(", ")} is typing...
-              </>
-            ) : (
-              <>
-                <span className={`w-2 h-2 rounded-full ${isOtherOnline ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                {isOtherOnline ? "online" : "offline"}
-              </>
-            )}
-          </p>
+          {typingUsers.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-2 mt-2">
+              <span className="flex space-x-1">
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
+                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+              </span>
+              {typingUsers.join(", ")} is typing...
+            </p>
+          )}
         </div>
-        <div className="flex gap-2 lg:gap-3 text-gray-600 dark:text-gray-300 items-center">
+        <div className="flex gap-2 text-gray-600 dark:text-gray-300 items-center">
           {/* Search Bar */}
           <div className="relative" ref={searchRef}>
             {showSearch ? (
@@ -132,7 +130,7 @@ export default function ChatHeader({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search messages..."
-                  className="w-64 pl-10 pr-10 py-2 border dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200"
+                  className="w-64 pl-10 pr-10 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 shadow-sm"
                   autoFocus
                 />
                 <button
@@ -186,7 +184,7 @@ export default function ChatHeader({
             ) : (
               <button
                 onClick={() => setShowSearch(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+                className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                 title="Search messages"
               >
                 <Search className="w-5 h-5" />
@@ -198,7 +196,7 @@ export default function ChatHeader({
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
+              className="p-2.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               title="More options"
             >
               <MoreVertical className="w-5 h-5" />

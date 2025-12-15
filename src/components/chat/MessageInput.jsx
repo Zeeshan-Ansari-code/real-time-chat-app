@@ -46,7 +46,7 @@ export default function MessageInput({
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); onSend(); }}
-      className="p-4 lg:p-6 border-t dark:border-gray-700 bg-gradient-to-r from-white to-blue-50 dark:from-gray-900 dark:to-blue-900/20 flex gap-2 lg:gap-3"
+      className="p-5 lg:p-6 border-t border-gray-200 dark:border-gray-800 bg-gradient-to-r from-white via-blue-50/30 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 shadow-sm flex gap-3"
     >
       {/* File upload button */}
       <button
@@ -98,7 +98,7 @@ export default function MessageInput({
       />
       <button
         type="submit"
-        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-full hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm lg:text-base"
+        className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 lg:px-6 py-2 lg:py-3 rounded-full hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm lg:text-base"
         disabled={(!newMsg.trim() && !selectedFile)}
       >
         Send
