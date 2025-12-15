@@ -729,7 +729,7 @@ export default function ChatPage() {
         return () => clearTimeout(id);
     }, [selectedConv]);
 
-    if (!user || isLoadingChats) {
+    if (!user) {
         return (
             <div className={`${dark ? "dark" : ""} h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
                 <div className="flex flex-col items-center gap-3 text-gray-600 dark:text-gray-300">
@@ -770,7 +770,8 @@ export default function ChatPage() {
                                 onSelectConversation={handleSelectConversation}
                                 onUnarchiveConversation={handleUnarchiveConversation}
                                 onLogout={handleLogout}
-                                isLoggingOut={isLoggingOut}
+                            isLoggingOut={isLoggingOut}
+                            isLoadingChats={isLoadingChats}
                             />
                         </div>
                     )}
@@ -864,6 +865,7 @@ export default function ChatPage() {
                         onUnarchiveConversation={handleUnarchiveConversation}
                         onLogout={handleLogout}
                         isLoggingOut={isLoggingOut}
+                        isLoadingChats={isLoadingChats}
                     />
 
                     <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">

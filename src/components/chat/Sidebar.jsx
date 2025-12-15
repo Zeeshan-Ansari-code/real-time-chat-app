@@ -18,7 +18,8 @@ export default function Sidebar({
   onSelectConversation,
   onUnarchiveConversation,
   onLogout,
-  isLoggingOut
+  isLoggingOut,
+  isLoadingChats
 }) {
   const [showArchived, setShowArchived] = useState(false);
   return (
@@ -93,72 +94,88 @@ export default function Sidebar({
       </div>
       {/* Conversations List */}
       <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
-      <ul className="space-y-0">
-        {conversations.length === 0 && archivedConversations?.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 p-6">
-            <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
-              <Search className="w-8 h-8 text-gray-300 dark:text-gray-600" />
-            </div>
-            <p className="text-center text-sm font-medium">No conversations yet</p>
-            <p className="text-center text-xs mt-1 text-gray-400 dark:text-gray-600">Search for users to start chatting!</p>
-          </div>
-        )}
-        {conversations.map((c) => {
-          if (!c.participants || c.participants.length === 0) return null;
-          const otherUser = c.participants.find((p) => p._id !== user.id);
-          const isOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
-
-          return (
-            <li
-              key={c._id}
-              className={`mb-2 p-3 rounded-xl cursor-pointer transition-all duration-200 group shadow-sm border border-transparent ${
-                selectedConv === c._id 
-                  ? "bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 border-blue-200/50 dark:border-blue-800/50" 
-                  : "bg-white/60 dark:bg-gray-900/40 border-gray-100/70 dark:border-gray-800 hover:border-blue-200 hover:bg-blue-50/40 dark:hover:bg-blue-900/10"
-              }`}
-              onClick={() => onSelectConversation(c._id)}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative flex-shrink-0">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md ${
-                    selectedConv === c._id 
-                      ? "bg-gradient-to-br from-blue-500 to-blue-600" 
-                      : "bg-gradient-to-br from-blue-500 to-blue-600 opacity-80 group-hover:opacity-100"
-                  } transition-all duration-200`}>
-                    {otherUser?.name?.[0] || "?"}
+        {isLoadingChats ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="p-3 rounded-xl bg-white/60 dark:bg-gray-900/40 border border-gray-100/70 dark:border-gray-800 shadow-sm animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-800" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 bg-gray-200 dark:bg-gray-800 rounded w-1/2"></div>
+                    <div className="h-3 bg-gray-200 dark:bg-gray-800 rounded w-3/4"></div>
                   </div>
-                  {isOnline && (
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 shadow-md" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className={`font-semibold text-sm truncate ${
-                        selectedConv === c._id 
-                          ? "text-blue-900 dark:text-blue-100" 
-                          : "text-gray-900 dark:text-white"
-                      }`}>
-                      {otherUser?.name || "Unknown User"}
-                    </p>
-                    {c.unreadCount > 0 && (
-                      <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-sm">
-                        {c.unreadCount}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-xs leading-5 ${
-                    selectedConv === c._id 
-                      ? "text-blue-700 dark:text-blue-300" 
-                      : "text-gray-600 dark:text-gray-400"
-                  } line-clamp-1`}>
-                    {c.lastMessage?.text || "No messages yet"}
-                  </p>
                 </div>
               </div>
-            </li>
-          );
-        })}
-      </ul>
+            ))}
+          </div>
+        ) : (
+          <ul className="space-y-0">
+            {conversations.length === 0 && archivedConversations?.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 p-6">
+                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
+                  <Search className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                </div>
+                <p className="text-center text-sm font-medium">No conversations yet</p>
+                <p className="text-center text-xs mt-1 text-gray-400 dark:text-gray-600">Search for users to start chatting!</p>
+              </div>
+            )}
+            {conversations.map((c) => {
+              if (!c.participants || c.participants.length === 0) return null;
+              const otherUser = c.participants.find((p) => p._id !== user.id);
+              const isOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
+
+              return (
+                <li
+                  key={c._id}
+                  className={`mb-2 p-3 rounded-xl cursor-pointer transition-all duration-200 group shadow-sm border border-transparent ${
+                    selectedConv === c._id 
+                      ? "bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 border-blue-200/50 dark:border-blue-800/50" 
+                      : "bg-white/60 dark:bg-gray-900/40 border-gray-100/70 dark:border-gray-800 hover:border-blue-200 hover:bg-blue-50/40 dark:hover:bg-blue-900/10"
+                  }`}
+                  onClick={() => onSelectConversation(c._id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-shrink-0">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md ${
+                        selectedConv === c._id 
+                          ? "bg-gradient-to-br from-blue-500 to-blue-600" 
+                          : "bg-gradient-to-br from-blue-500 to-blue-600 opacity-80 group-hover:opacity-100"
+                      } transition-all duration-200`}>
+                        {otherUser?.name?.[0] || "?"}
+                      </div>
+                      {isOnline && (
+                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 shadow-md" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className={`font-semibold text-sm truncate ${
+                            selectedConv === c._id 
+                              ? "text-blue-900 dark:text-blue-100" 
+                              : "text-gray-900 dark:text-white"
+                          }`}>
+                          {otherUser?.name || "Unknown User"}
+                        </p>
+                        {c.unreadCount > 0 && (
+                          <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-sm">
+                            {c.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-xs leading-5 ${
+                        selectedConv === c._id 
+                          ? "text-blue-700 dark:text-blue-300" 
+                          : "text-gray-600 dark:text-gray-400"
+                      } line-clamp-1`}>
+                        {c.lastMessage?.text || "No messages yet"}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
       
       {/* Archived Chats Section */}
