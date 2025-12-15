@@ -756,7 +756,7 @@ export default function ChatPage() {
     const otherUserId = otherUser?._id;
 
     return (
-        <div className={`${dark ? "dark" : ""} min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
+        <div className={`${dark ? "dark" : ""} h-screen flex flex-col lg:flex-row bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
             {isMobile ? (
                 <>
                     {showSidebar && (
