@@ -17,7 +17,8 @@ export default function Sidebar({
   selectedConv,
   onSelectConversation,
   onUnarchiveConversation,
-  onLogout
+  onLogout,
+  isLoggingOut
 }) {
   const [showArchived, setShowArchived] = useState(false);
   return (
@@ -207,9 +208,17 @@ export default function Sidebar({
       <div className="p-3 border-t dark:border-gray-700">
         <button
           onClick={onLogout}
-          className="w-full text-sm bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+          disabled={isLoggingOut}
+          className="w-full text-sm bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
         >
-          Logout
+          {isLoggingOut ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Logging out...
+            </>
+          ) : (
+            "Logout"
+          )}
         </button>
       </div>
     </div>

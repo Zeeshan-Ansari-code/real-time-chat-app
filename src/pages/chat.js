@@ -36,6 +36,7 @@ export default function ChatPage() {
     const [incomingCall, setIncomingCall] = useState(null);
     const [showCallModal, setShowCallModal] = useState(false);
     const [isOutgoingCall, setIsOutgoingCall] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -654,7 +655,8 @@ export default function ChatPage() {
         }
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
         try {
             presenceRef.current?.unbind_all?.();
             if (presenceRef.current) {
@@ -663,6 +665,8 @@ export default function ChatPage() {
             pusherRef.current?.disconnect?.();
         } catch (_) {}
         localStorage.removeItem("user");
+        // Small delay to show loading state
+        await new Promise(resolve => setTimeout(resolve, 500));
         router.push("/");
     };
 
@@ -714,6 +718,7 @@ export default function ChatPage() {
                 onSelectConversation={loadMessages}
                 onUnarchiveConversation={handleUnarchiveConversation}
                 onLogout={handleLogout}
+                isLoggingOut={isLoggingOut}
             />
 
             <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 min-h-0">

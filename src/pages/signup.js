@@ -10,10 +10,12 @@ export default function SignupPage() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [dark, setDark] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleSignup = async (e) => {
         e.preventDefault();
         setError("");
+        setIsLoading(true);
         try {
             await axios.post("/api/auth/signup", { name, email, password });
             // Auto-login after signup
@@ -22,6 +24,7 @@ export default function SignupPage() {
             router.push("/chat");
         } catch (err) {
             setError(err.response?.data?.error || "Signup failed");
+            setIsLoading(false);
         }
     };
 
@@ -66,9 +69,17 @@ export default function SignupPage() {
 
                 <button
                     type="submit"
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl hover:from-blue-600 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    disabled={isLoading}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl hover:from-blue-600 hover:to-purple-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
                 >
-                    Create account
+                    {isLoading ? (
+                        <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Creating account...
+                        </>
+                    ) : (
+                        "Create account"
+                    )}
                 </button>
 
                 <p className="text-center text-sm text-gray-500 dark:text-gray-400">
