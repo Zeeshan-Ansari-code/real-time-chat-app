@@ -23,7 +23,7 @@ export default function Sidebar({
 }) {
   const [showArchived, setShowArchived] = useState(false);
   return (
-    <div className="w-full lg:w-80 xl:w-96 min-h-screen bg-gradient-to-b from-white via-blue-50/50 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300 shadow-sm">
+    <div className="w-full lg:w-80 xl:w-96 min-h-screen bg-gradient-to-b from-white via-blue-50/50 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-all duration-300 shadow-sm relative">
       {/* Modern Header */}
       <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
@@ -93,7 +93,10 @@ export default function Sidebar({
         )}
       </div>
       {/* Conversations List */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-2 py-2"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)" }}
+      >
         {isLoadingChats ? (
           <div className="space-y-2">
             {Array.from({ length: 6 }).map((_, idx) => (
@@ -268,7 +271,7 @@ export default function Sidebar({
       
       {/* User Profile & Logout */}
       <div
-        className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto pb-6"
+        className="sticky bottom-0 z-20 p-4 border-t border-gray-100 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur mt-auto pb-6"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 dark:border-gray-800">
