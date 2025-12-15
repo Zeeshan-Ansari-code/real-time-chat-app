@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useRouter } from "next/router";
 
@@ -9,6 +9,14 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [dark, setDark] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // If already logged in, go straight to chat
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("user") : null;
+    if (stored) {
+      router.replace("/chat");
+    }
+  }, [router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
