@@ -78,7 +78,7 @@ export default function ProfilePage() {
 
   return (
     <div className={`${dark ? "dark" : ""} min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900`}>
-      <div className="max-w-4xl mx-auto p-4 lg:p-8">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-6">
           <button
@@ -95,10 +95,10 @@ export default function ProfilePage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
           {/* Avatar and Name */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-32 h-32 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-4xl shadow-lg mb-4">
+            <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-3xl sm:text-4xl shadow-lg mb-4">
               {user.name?.[0]?.toUpperCase() || "?"}
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{user.name || "Unknown User"}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{user.name || "Unknown User"}</h2>
             {isOwnProfile && (
               <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                 You
@@ -138,7 +138,7 @@ export default function ProfilePage() {
             <div className="mt-8 pt-8 border-t dark:border-gray-700">
               <button
                 onClick={() => router.push(`/chat?userId=${user._id || user.id}`)}
-                className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
               >
                 Send Message
               </button>

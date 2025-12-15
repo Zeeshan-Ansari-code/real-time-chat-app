@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Search, MoreVertical, X, User, Trash2, Archive, Bell, BellOff } from "lucide-react";
+import { Search, MoreVertical, X, User, Trash2, Archive, Bell, BellOff, ArrowLeft } from "lucide-react";
 import CallButton from "@/components/call/CallButton";
 
 export default function ChatHeader({
@@ -19,7 +19,9 @@ export default function ChatHeader({
   onDeleteConversation,
   isArchived = false,
   onArchiveConversation,
-  onUnarchiveConversation
+  onUnarchiveConversation,
+  onBackMobile,
+  showBackButton = false
 }) {
   const [showSearch, setShowSearch] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -80,6 +82,15 @@ export default function ChatHeader({
       <div className="flex justify-between items-start gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-3">
+            {showBackButton && onBackMobile && (
+              <button
+                onClick={onBackMobile}
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-300 -ml-2"
+                aria-label="Back to chats"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
             <h2 className="font-bold text-gray-900 dark:text-white text-xl lg:text-2xl truncate">
               {otherUserName || "Unknown User"}
             </h2>
@@ -214,7 +225,7 @@ export default function ChatHeader({
                     }}
                     className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
                   >
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold">
                       {otherUser?.name?.[0] || "?"}
                     </div>
                     <div className="flex-1 min-w-0">

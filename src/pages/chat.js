@@ -37,6 +37,8 @@ export default function ChatPage() {
     const [showCallModal, setShowCallModal] = useState(false);
     const [isOutgoingCall, setIsOutgoingCall] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(true);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -377,6 +379,22 @@ export default function ChatPage() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
+    // Responsive handling for mobile/tablet: show either list or chat
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = typeof window !== "undefined" ? window.innerWidth < 1024 : false;
+            setIsMobile(mobile);
+            if (!mobile) {
+                setShowSidebar(true);
+            } else {
+                setShowSidebar(selectedConv ? false : true);
+            }
+        };
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, [selectedConv]);
+
     const loadMessages = async (convId) => {
         setSelectedConv(convId);
         selectedConvRef.current = convId;
@@ -527,6 +545,19 @@ export default function ChatPage() {
             }
             return newSet;
         });
+    };
+
+    const handleSelectConversation = async (convId) => {
+        await loadMessages(convId);
+        if (isMobile) {
+            setShowSidebar(false);
+        }
+    };
+
+    const handleBackToList = () => {
+        if (isMobile) {
+            setShowSidebar(true);
+        }
     };
 
     const translateSelectedMessage = async (messageId, targetLang) => {
@@ -702,83 +733,171 @@ export default function ChatPage() {
 
     return (
         <div className={`${dark ? "dark" : ""} h-screen flex flex-col lg:flex-row bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
-            <Sidebar
-                dark={dark}
-                toggleDark={toggleDark}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                searchResults={searchResults}
-                isSearching={isSearching}
-                onStartConversation={startConversation}
-                conversations={conversations}
-                archivedConversations={archivedConversations}
-                user={user}
-                onlineUsers={onlineUsers}
-                selectedConv={selectedConv}
-                onSelectConversation={loadMessages}
-                onUnarchiveConversation={handleUnarchiveConversation}
-                onLogout={handleLogout}
-                isLoggingOut={isLoggingOut}
-            />
+            {isMobile ? (
+                <>
+                    {showSidebar && (
+                        <div className="flex-1 min-h-0">
+                            <Sidebar
+                                dark={dark}
+                                toggleDark={toggleDark}
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                searchResults={searchResults}
+                                isSearching={isSearching}
+                                onStartConversation={startConversation}
+                                conversations={conversations}
+                                archivedConversations={archivedConversations}
+                                user={user}
+                                onlineUsers={onlineUsers}
+                                selectedConv={selectedConv}
+                                onSelectConversation={handleSelectConversation}
+                                onUnarchiveConversation={handleUnarchiveConversation}
+                                onLogout={handleLogout}
+                                isLoggingOut={isLoggingOut}
+                            />
+                        </div>
+                    )}
 
-            <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
-                {selectedConv ? (
-                    <>
-                        <ChatHeader
-                            otherUserName={otherUser?.name}
-                            recvLang={recvLang}
-                            onRecvLangChange={saveRecvLang}
-                            isTranslating={isTranslating}
-                            typingUsers={typingUsers}
-                            isOtherOnline={isOtherOnline}
+                    {!showSidebar && (
+                        <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
+                            {selectedConv ? (
+                                <>
+                                    <ChatHeader
+                                        otherUserName={otherUser?.name}
+                                        recvLang={recvLang}
+                                        onRecvLangChange={saveRecvLang}
+                                        isTranslating={isTranslating}
+                                        typingUsers={typingUsers}
+                                        isOtherOnline={isOtherOnline}
+                                        conversationId={selectedConv}
+                                        otherUser={otherUser}
+                                        user={user}
+                                        pusherRef={pusherRef.current}
+                                        onOutgoingCall={setIsOutgoingCall}
+                                        messages={messages}
+                                        onDeleteConversation={async () => {}}
+                                        isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                        onArchiveConversation={handleArchiveConversation}
+                                        onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
+                                        onBackMobile={handleBackToList}
+                                        showBackButton
+                                    />
+
+                                    <MessageList
+                                        messages={messages}
+                                        user={user}
+                                        selectedMessages={selectedMessages}
+                                        onToggleMessageSelection={toggleMessageSelection}
+                                        onTranslateMessage={setSelectedMessageForTranslation}
+                                        onDeleteMessage={setSelectedMessageForDeletion}
+                                        formatFileSize={formatFileSize}
+                                        otherUserId={otherUserId}
+                                        isTranslatingMessage={isTranslatingMessage}
+                                        isDeletingMessage={isDeletingMessage}
+                                        messagesContainerRef={messagesContainerRef}
+                                        messagesEndRef={messagesEndRef}
+                                    />
+
+                                    <MessageInput
+                                        newMsg={newMsg}
+                                        setNewMsg={setNewMsg}
+                                        onSend={sendMessage}
+                                        fileInputRef={fileInputRef}
+                                        handleFileSelect={handleFileSelect}
+                                        selectedFile={selectedFile}
+                                        removeSelectedFile={removeSelectedFile}
+                                        isUploading={isUploading}
+                                        conversationId={selectedConv}
+                                        user={user}
+                                    />
+                                </>
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                    Select a conversation to start chatting.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            ) : (
+                <>
+                    <Sidebar
+                        dark={dark}
+                        toggleDark={toggleDark}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        searchResults={searchResults}
+                        isSearching={isSearching}
+                        onStartConversation={startConversation}
+                        conversations={conversations}
+                        archivedConversations={archivedConversations}
+                        user={user}
+                        onlineUsers={onlineUsers}
+                        selectedConv={selectedConv}
+                        onSelectConversation={handleSelectConversation}
+                        onUnarchiveConversation={handleUnarchiveConversation}
+                        onLogout={handleLogout}
+                        isLoggingOut={isLoggingOut}
+                    />
+
+                    <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
+                        {selectedConv ? (
+                            <>
+                                <ChatHeader
+                                    otherUserName={otherUser?.name}
+                                    recvLang={recvLang}
+                                    onRecvLangChange={saveRecvLang}
+                                    isTranslating={isTranslating}
+                                    typingUsers={typingUsers}
+                                    isOtherOnline={isOtherOnline}
                                     conversationId={selectedConv}
                                     otherUser={otherUser}
                                     user={user}
                                     pusherRef={pusherRef.current}
                                     onOutgoingCall={setIsOutgoingCall}
-                            messages={messages}
-                            onDeleteConversation={async () => {
-                                // Delete conversation logic can be added here
-                            }}
-                            isArchived={archivedConversations.some((c) => c._id === selectedConv)}
-                            onArchiveConversation={handleArchiveConversation}
-                            onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
-                        />
+                                    messages={messages}
+                                    onDeleteConversation={async () => {}}
+                                    isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                    onArchiveConversation={handleArchiveConversation}
+                                    onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
+                                />
 
-                        <MessageList
-                            messages={messages}
-                            user={user}
-                            selectedMessages={selectedMessages}
-                            onToggleMessageSelection={toggleMessageSelection}
-                            onTranslateMessage={setSelectedMessageForTranslation}
-                            onDeleteMessage={setSelectedMessageForDeletion}
-                            formatFileSize={formatFileSize}
-                            otherUserId={otherUserId}
-                            isTranslatingMessage={isTranslatingMessage}
-                            isDeletingMessage={isDeletingMessage}
-                            messagesContainerRef={messagesContainerRef}
-                            messagesEndRef={messagesEndRef}
-                        />
+                                <MessageList
+                                    messages={messages}
+                                    user={user}
+                                    selectedMessages={selectedMessages}
+                                    onToggleMessageSelection={toggleMessageSelection}
+                                    onTranslateMessage={setSelectedMessageForTranslation}
+                                    onDeleteMessage={setSelectedMessageForDeletion}
+                                    formatFileSize={formatFileSize}
+                                    otherUserId={otherUserId}
+                                    isTranslatingMessage={isTranslatingMessage}
+                                    isDeletingMessage={isDeletingMessage}
+                                    messagesContainerRef={messagesContainerRef}
+                                    messagesEndRef={messagesEndRef}
+                                />
 
-                        <MessageInput
-                            newMsg={newMsg}
-                            setNewMsg={setNewMsg}
-                            onSend={sendMessage}
-                            fileInputRef={fileInputRef}
-                            handleFileSelect={handleFileSelect}
-                            selectedFile={selectedFile}
-                            removeSelectedFile={removeSelectedFile}
-                            isUploading={isUploading}
-                            conversationId={selectedConv}
-                            user={user}
-                        />
-                    </>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                        Select a conversation to start chatting.
+                                <MessageInput
+                                    newMsg={newMsg}
+                                    setNewMsg={setNewMsg}
+                                    onSend={sendMessage}
+                                    fileInputRef={fileInputRef}
+                                    handleFileSelect={handleFileSelect}
+                                    selectedFile={selectedFile}
+                                    removeSelectedFile={removeSelectedFile}
+                                    isUploading={isUploading}
+                                    conversationId={selectedConv}
+                                    user={user}
+                                />
+                            </>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                Select a conversation to start chatting.
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </>
+            )}
 
             <TranslationModal
                 message={selectedMessageForTranslation}
