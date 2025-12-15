@@ -20,6 +20,8 @@ export default function ChatPage() {
     const [archivedConversations, setArchivedConversations] = useState([]);
     const [selectedConv, setSelectedConv] = useState(null);
     const [messages, setMessages] = useState([]);
+    const [isLoadingChats, setIsLoadingChats] = useState(true);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [newMsg, setNewMsg] = useState("");
     const [typingUsers, setTypingUsers] = useState([]);
     const [onlineUsers, setOnlineUsers] = useState([]);
@@ -86,32 +88,27 @@ export default function ChatPage() {
     // Load user and conversations
     useEffect(() => {
         const stored = localStorage.getItem("user");
-        if (!stored) router.push("/");
-        else {
+        if (!stored) {
+            router.push("/");
+        } else {
             const parsed = JSON.parse(stored);
             setUser(parsed);
-            // Load regular conversations
-            axios
-                .get(`/api/conversations?userId=${parsed.id}`)
-                .then((res) => {
-                    const list = Array.isArray(res.data) ? res.data : [];
-                    const map = new Map(list.map((c) => [c._id, c]));
-                    setConversations(Array.from(map.values()));
-                });
-            
-            // Load archived conversations
-            axios
-                .get(`/api/conversations?userId=${parsed.id}&includeArchived=true`)
-                .then((res) => {
-                    const list = Array.isArray(res.data) ? res.data : [];
-                    // The API already filters to only archived conversations
-                    const map = new Map(list.map((c) => [c._id, c]));
-                    setArchivedConversations(Array.from(map.values()));
-                })
-                .catch((err) => {
-                    // If error, set empty array
-                    setArchivedConversations([]);
-                });
+            const load = async () => {
+                setIsLoadingChats(true);
+                try {
+                    const [regularRes, archivedRes] = await Promise.all([
+                        axios.get(`/api/conversations?userId=${parsed.id}`),
+                        axios.get(`/api/conversations?userId=${parsed.id}&includeArchived=true`).catch(() => ({ data: [] }))
+                    ]);
+                    const regularList = Array.isArray(regularRes.data) ? regularRes.data : [];
+                    const archivedList = Array.isArray(archivedRes.data) ? archivedRes.data : [];
+                    setConversations(Array.from(new Map(regularList.map((c) => [c._id, c])).values()));
+                    setArchivedConversations(Array.from(new Map(archivedList.map((c) => [c._id, c])).values()));
+                } finally {
+                    setIsLoadingChats(false);
+                }
+            };
+            load();
         }
     }, [router]);
 
@@ -387,21 +384,27 @@ export default function ChatPage() {
             if (!mobile) {
                 setShowSidebar(true);
             } else {
-                setShowSidebar(selectedConv ? false : true);
+                const hasSelection = !!selectedConvRef.current;
+                setShowSidebar(hasSelection ? false : true);
             }
         };
         handleResize();
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
-    }, [selectedConv]);
+    }, []); // rely on ref to avoid stale closure
 
     const loadMessages = async (convId) => {
+        setIsLoadingMessages(true);
         setSelectedConv(convId);
         selectedConvRef.current = convId;
-        const res = await axios.get(`/api/messages/${convId}`);
-        setMessages(res.data);
-        setTimeout(() => scrollToBottom(), 0);
-        setConversations((prev) => prev.map((c) => (c._id === convId ? { ...c, unreadCount: 0 } : c)));
+        try {
+            const res = await axios.get(`/api/messages/${convId}`);
+            setMessages(res.data);
+            setTimeout(() => scrollToBottom(), 0);
+            setConversations((prev) => prev.map((c) => (c._id === convId ? { ...c, unreadCount: 0 } : c)));
+        } finally {
+            setIsLoadingMessages(false);
+        }
 
         const pusher = pusherClient(user);
         const channel = pusher.subscribe(`conversation-${convId}`);
@@ -557,6 +560,9 @@ export default function ChatPage() {
     const handleBackToList = () => {
         if (isMobile) {
             setShowSidebar(true);
+            setSelectedConv(null);
+            selectedConvRef.current = null;
+            setMessages([]);
         }
     };
 
@@ -721,7 +727,16 @@ export default function ChatPage() {
         return () => clearTimeout(id);
     }, [selectedConv]);
 
-    if (!user) return <p>Loading...</p>;
+    if (!user || isLoadingChats) {
+        return (
+            <div className={`${dark ? "dark" : ""} h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
+                <div className="flex flex-col items-center gap-3 text-gray-600 dark:text-gray-300">
+                    <div className="w-10 h-10 border-4 border-blue-500/40 border-t-blue-600 rounded-full animate-spin"></div>
+                    <p className="text-sm font-medium">Loading chats...</p>
+                </div>
+            </div>
+        );
+    }
 
     // Find otherUser from either regular or archived conversations
     const selectedConversation = conversations.find((c) => c._id === selectedConv) 
@@ -783,20 +798,29 @@ export default function ChatPage() {
                                         showBackButton
                                     />
 
-                                    <MessageList
-                                        messages={messages}
-                                        user={user}
-                                        selectedMessages={selectedMessages}
-                                        onToggleMessageSelection={toggleMessageSelection}
-                                        onTranslateMessage={setSelectedMessageForTranslation}
-                                        onDeleteMessage={setSelectedMessageForDeletion}
-                                        formatFileSize={formatFileSize}
-                                        otherUserId={otherUserId}
-                                        isTranslatingMessage={isTranslatingMessage}
-                                        isDeletingMessage={isDeletingMessage}
-                                        messagesContainerRef={messagesContainerRef}
-                                        messagesEndRef={messagesEndRef}
-                                    />
+                                    {isLoadingMessages ? (
+                                        <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="w-10 h-10 border-4 border-blue-500/40 border-t-blue-600 rounded-full animate-spin"></div>
+                                                <p className="text-sm font-medium">Loading messages...</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <MessageList
+                                            messages={messages}
+                                            user={user}
+                                            selectedMessages={selectedMessages}
+                                            onToggleMessageSelection={toggleMessageSelection}
+                                            onTranslateMessage={setSelectedMessageForTranslation}
+                                            onDeleteMessage={setSelectedMessageForDeletion}
+                                            formatFileSize={formatFileSize}
+                                            otherUserId={otherUserId}
+                                            isTranslatingMessage={isTranslatingMessage}
+                                            isDeletingMessage={isDeletingMessage}
+                                            messagesContainerRef={messagesContainerRef}
+                                            messagesEndRef={messagesEndRef}
+                                        />
+                                    )}
 
                                     <MessageInput
                                         newMsg={newMsg}
@@ -862,20 +886,29 @@ export default function ChatPage() {
                                     onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
                                 />
 
-                                <MessageList
-                                    messages={messages}
-                                    user={user}
-                                    selectedMessages={selectedMessages}
-                                    onToggleMessageSelection={toggleMessageSelection}
-                                    onTranslateMessage={setSelectedMessageForTranslation}
-                                    onDeleteMessage={setSelectedMessageForDeletion}
-                                    formatFileSize={formatFileSize}
-                                    otherUserId={otherUserId}
-                                    isTranslatingMessage={isTranslatingMessage}
-                                    isDeletingMessage={isDeletingMessage}
-                                    messagesContainerRef={messagesContainerRef}
-                                    messagesEndRef={messagesEndRef}
-                                />
+                                {isLoadingMessages ? (
+                                    <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-10 h-10 border-4 border-blue-500/40 border-t-blue-600 rounded-full animate-spin"></div>
+                                            <p className="text-sm font-medium">Loading messages...</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <MessageList
+                                        messages={messages}
+                                        user={user}
+                                        selectedMessages={selectedMessages}
+                                        onToggleMessageSelection={toggleMessageSelection}
+                                        onTranslateMessage={setSelectedMessageForTranslation}
+                                        onDeleteMessage={setSelectedMessageForDeletion}
+                                        formatFileSize={formatFileSize}
+                                        otherUserId={otherUserId}
+                                        isTranslatingMessage={isTranslatingMessage}
+                                        isDeletingMessage={isDeletingMessage}
+                                        messagesContainerRef={messagesContainerRef}
+                                        messagesEndRef={messagesEndRef}
+                                    />
+                                )}
 
                                 <MessageInput
                                     newMsg={newMsg}

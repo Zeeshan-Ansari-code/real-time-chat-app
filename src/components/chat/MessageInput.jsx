@@ -46,7 +46,8 @@ export default function MessageInput({
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); onSend(); }}
-      className="p-4 sm:p-5 lg:p-6 border-t border-gray-200 dark:border-gray-800 bg-gradient-to-r from-white via-blue-50/30 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 shadow-sm flex items-center gap-3 flex-wrap"
+      className="p-4 sm:p-5 lg:p-6 border-t border-gray-200 dark:border-gray-800 bg-gradient-to-r from-white via-blue-50/30 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 shadow-sm flex items-center gap-3 flex-wrap pb-6 lg:pb-6"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)" }}
     >
       {/* File upload button */}
       <button

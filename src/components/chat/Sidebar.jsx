@@ -250,7 +250,10 @@ export default function Sidebar({
       )}
       
       {/* User Profile & Logout */}
-      <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto">
+      <div
+        className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 mt-auto pb-6"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
+      >
         <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 dark:border-gray-800">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
             {user?.name?.[0] || "U"}
