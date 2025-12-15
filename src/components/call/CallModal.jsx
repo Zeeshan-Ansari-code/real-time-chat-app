@@ -26,6 +26,15 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     createPeerConnectionAndAttach
   } = useWebRTC(conversationId, user, otherUser, setStatus);
 
+  // Prevent background scroll while modal is open
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   useEffect(() => {
     if (!pusher && user) {
       const client = pusherClient(user);
@@ -339,8 +348,8 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   const isIncomingCallModal = status === "incoming" && !isOutgoingCall;
   
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-gray-700 ${isIncomingCallModal ? 'animate-pulse' : ''}`}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-6 overflow-y-auto">
+      <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-auto border border-gray-200 dark:border-gray-700 ${isIncomingCallModal ? 'animate-pulse' : ''}`}>
         {/* Header - Only show for non-incoming calls */}
         {!isIncomingCallModal && (
           <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700">

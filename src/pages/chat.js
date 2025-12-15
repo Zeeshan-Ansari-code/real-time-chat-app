@@ -787,7 +787,7 @@ export default function ChatPage() {
                         <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
                             {selectedConv ? (
                                 <>
-                                    <div className="sticky top-0 z-20 bg-gradient-to-r from-white via-blue-50/60 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-900/70">
+                                    <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 shadow-sm">
                                         <ChatHeader
                                             otherUserName={otherUser?.name}
                                             recvLang={recvLang}
@@ -818,24 +818,24 @@ export default function ChatPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <MessageList
-                                            messages={messages}
-                                            user={user}
-                                            selectedMessages={selectedMessages}
-                                            onToggleMessageSelection={toggleMessageSelection}
-                                            onTranslateMessage={setSelectedMessageForTranslation}
-                                            onDeleteMessage={setSelectedMessageForDeletion}
-                                            formatFileSize={formatFileSize}
-                                            otherUserId={otherUserId}
-                                            isTranslatingMessage={isTranslatingMessage}
-                                            isDeletingMessage={isDeletingMessage}
-                                            messagesContainerRef={messagesContainerRef}
-                                        messagesEndRef={messagesEndRef}
-                                        typingUsers={typingUsers}
-                                        />
+                                <MessageList
+                                    messages={messages}
+                                    user={user}
+                                    selectedMessages={selectedMessages}
+                                    onToggleMessageSelection={toggleMessageSelection}
+                                    onTranslateMessage={setSelectedMessageForTranslation}
+                                    onDeleteMessage={setSelectedMessageForDeletion}
+                                    formatFileSize={formatFileSize}
+                                    otherUserId={otherUserId}
+                                    isTranslatingMessage={isTranslatingMessage}
+                                    isDeletingMessage={isDeletingMessage}
+                                    messagesContainerRef={messagesContainerRef}
+                                    messagesEndRef={messagesEndRef}
+                                    typingUsers={typingUsers}
+                                />
                                     )}
 
-                                    <div className="sticky bottom-0 z-20">
+                                    <div className="sticky bottom-0 z-10">
                                         <MessageInput
                                             newMsg={newMsg}
                                             setNewMsg={setNewMsg}
@@ -883,7 +883,7 @@ export default function ChatPage() {
                     <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
                         {selectedConv ? (
                             <>
-                                <div className="sticky top-0 z-20 bg-gradient-to-r from-white via-blue-50/60 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-900/70">
+                                <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 shadow-sm">
                                     <ChatHeader
                                         otherUserName={otherUser?.name}
                                         recvLang={recvLang}
@@ -929,7 +929,7 @@ export default function ChatPage() {
                                     />
                                 )}
 
-                                <div className="sticky bottom-0 z-20">
+                                <div className="sticky bottom-0 z-10">
                                     <MessageInput
                                         newMsg={newMsg}
                                         setNewMsg={setNewMsg}

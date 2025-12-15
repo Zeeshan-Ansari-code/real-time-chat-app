@@ -75,7 +75,7 @@ export default function MessageList({
     <div
       ref={messagesContainerRef}
       className="flex-1 overflow-y-auto p-5 lg:p-6 space-y-4 bg-gradient-to-b from-white via-blue-50/30 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" }}
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 40px)" }}
     >
       {messages.length === 0 && (
         <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
