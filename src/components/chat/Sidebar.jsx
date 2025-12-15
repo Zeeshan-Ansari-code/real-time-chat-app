@@ -111,10 +111,10 @@ export default function Sidebar({
           return (
             <li
               key={c._id}
-              className={`mb-1.5 p-3 rounded-xl cursor-pointer transition-all duration-200 group ${
+              className={`mb-2 p-3 rounded-xl cursor-pointer transition-all duration-200 group shadow-sm border border-transparent ${
                 selectedConv === c._id 
-                  ? "bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 shadow-sm border border-blue-200/50 dark:border-blue-800/50" 
-                  : "hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                  ? "bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-900/30 dark:to-blue-800/20 border-blue-200/50 dark:border-blue-800/50" 
+                  : "bg-white/60 dark:bg-gray-900/40 border-gray-100/70 dark:border-gray-800 hover:border-blue-200 hover:bg-blue-50/40 dark:hover:bg-blue-900/10"
               }`}
               onClick={() => onSelectConversation(c._id)}
             >
@@ -123,7 +123,7 @@ export default function Sidebar({
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md ${
                     selectedConv === c._id 
                       ? "bg-gradient-to-br from-blue-500 to-blue-600" 
-                      : "bg-gradient-to-br from-gray-400 to-gray-500 group-hover:from-blue-400 group-hover:to-blue-500"
+                      : "bg-gradient-to-br from-blue-500 to-blue-600 opacity-80 group-hover:opacity-100"
                   } transition-all duration-200`}>
                     {otherUser?.name?.[0] || "?"}
                   </div>
@@ -132,12 +132,12 @@ export default function Sidebar({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <p className={`font-semibold text-sm truncate ${
-                      selectedConv === c._id 
-                        ? "text-blue-900 dark:text-blue-100" 
-                        : "text-gray-900 dark:text-white"
-                    }`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className={`font-semibold text-sm truncate ${
+                        selectedConv === c._id 
+                          ? "text-blue-900 dark:text-blue-100" 
+                          : "text-gray-900 dark:text-white"
+                      }`}>
                       {otherUser?.name || "Unknown User"}
                     </p>
                     {c.unreadCount > 0 && (
@@ -149,7 +149,7 @@ export default function Sidebar({
                   <p className={`text-xs leading-5 ${
                     selectedConv === c._id 
                       ? "text-blue-700 dark:text-blue-300" 
-                      : "text-gray-500 dark:text-gray-400"
+                      : "text-gray-600 dark:text-gray-400"
                   } line-clamp-1`}>
                     {c.lastMessage?.text || "No messages yet"}
                   </p>
