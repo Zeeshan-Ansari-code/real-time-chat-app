@@ -717,6 +717,13 @@ export default function ChatPage() {
         if (isNearBottom) scrollToBottom();
     }, [messages]);
 
+    // After messages finish loading or on conversation change, jump to bottom once
+    useEffect(() => {
+        if (isLoadingMessages) return;
+        const id = setTimeout(() => scrollToBottom(), 0);
+        return () => clearTimeout(id);
+    }, [isLoadingMessages, selectedConv, messages.length]);
+
     // Update selectedConvRef when selectedConv changes
     useEffect(() => {
         selectedConvRef.current = selectedConv;
@@ -780,26 +787,28 @@ export default function ChatPage() {
                         <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
                             {selectedConv ? (
                                 <>
-                                    <ChatHeader
-                                        otherUserName={otherUser?.name}
-                                        recvLang={recvLang}
-                                        onRecvLangChange={saveRecvLang}
-                                        isTranslating={isTranslating}
-                                        typingUsers={typingUsers}
-                                        isOtherOnline={isOtherOnline}
-                                        conversationId={selectedConv}
-                                        otherUser={otherUser}
-                                        user={user}
-                                        pusherRef={pusherRef.current}
-                                        onOutgoingCall={setIsOutgoingCall}
-                                        messages={messages}
-                                        onDeleteConversation={async () => {}}
-                                        isArchived={archivedConversations.some((c) => c._id === selectedConv)}
-                                        onArchiveConversation={handleArchiveConversation}
-                                        onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
-                                        onBackMobile={handleBackToList}
-                                        showBackButton
-                                    />
+                                    <div className="sticky top-0 z-20 bg-gradient-to-r from-white via-blue-50/60 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-900/70">
+                                        <ChatHeader
+                                            otherUserName={otherUser?.name}
+                                            recvLang={recvLang}
+                                            onRecvLangChange={saveRecvLang}
+                                            isTranslating={isTranslating}
+                                            typingUsers={typingUsers}
+                                            isOtherOnline={isOtherOnline}
+                                            conversationId={selectedConv}
+                                            otherUser={otherUser}
+                                            user={user}
+                                            pusherRef={pusherRef.current}
+                                            onOutgoingCall={setIsOutgoingCall}
+                                            messages={messages}
+                                            onDeleteConversation={async () => {}}
+                                            isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                            onArchiveConversation={handleArchiveConversation}
+                                            onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
+                                            onBackMobile={handleBackToList}
+                                            showBackButton
+                                        />
+                                    </div>
 
                                     {isLoadingMessages ? (
                                         <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -821,22 +830,25 @@ export default function ChatPage() {
                                             isTranslatingMessage={isTranslatingMessage}
                                             isDeletingMessage={isDeletingMessage}
                                             messagesContainerRef={messagesContainerRef}
-                                            messagesEndRef={messagesEndRef}
+                                        messagesEndRef={messagesEndRef}
+                                        typingUsers={typingUsers}
                                         />
                                     )}
 
-                                    <MessageInput
-                                        newMsg={newMsg}
-                                        setNewMsg={setNewMsg}
-                                        onSend={sendMessage}
-                                        fileInputRef={fileInputRef}
-                                        handleFileSelect={handleFileSelect}
-                                        selectedFile={selectedFile}
-                                        removeSelectedFile={removeSelectedFile}
-                                        isUploading={isUploading}
-                                        conversationId={selectedConv}
-                                        user={user}
-                                    />
+                                    <div className="sticky bottom-0 z-20">
+                                        <MessageInput
+                                            newMsg={newMsg}
+                                            setNewMsg={setNewMsg}
+                                            onSend={sendMessage}
+                                            fileInputRef={fileInputRef}
+                                            handleFileSelect={handleFileSelect}
+                                            selectedFile={selectedFile}
+                                            removeSelectedFile={removeSelectedFile}
+                                            isUploading={isUploading}
+                                            conversationId={selectedConv}
+                                            user={user}
+                                        />
+                                    </div>
                                 </>
                             ) : (
                                 <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -871,24 +883,26 @@ export default function ChatPage() {
                     <div className="flex-1 flex flex-col bg-gradient-to-br from-white via-blue-50/40 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900 min-h-0 shadow-inner">
                         {selectedConv ? (
                             <>
-                                <ChatHeader
-                                    otherUserName={otherUser?.name}
-                                    recvLang={recvLang}
-                                    onRecvLangChange={saveRecvLang}
-                                    isTranslating={isTranslating}
-                                    typingUsers={typingUsers}
-                                    isOtherOnline={isOtherOnline}
-                                    conversationId={selectedConv}
-                                    otherUser={otherUser}
-                                    user={user}
-                                    pusherRef={pusherRef.current}
-                                    onOutgoingCall={setIsOutgoingCall}
-                                    messages={messages}
-                                    onDeleteConversation={async () => {}}
-                                    isArchived={archivedConversations.some((c) => c._id === selectedConv)}
-                                    onArchiveConversation={handleArchiveConversation}
-                                    onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
-                                />
+                                <div className="sticky top-0 z-20 bg-gradient-to-r from-white via-blue-50/60 to-blue-100/60 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-gray-900/70">
+                                    <ChatHeader
+                                        otherUserName={otherUser?.name}
+                                        recvLang={recvLang}
+                                        onRecvLangChange={saveRecvLang}
+                                        isTranslating={isTranslating}
+                                        typingUsers={typingUsers}
+                                        isOtherOnline={isOtherOnline}
+                                        conversationId={selectedConv}
+                                        otherUser={otherUser}
+                                        user={user}
+                                        pusherRef={pusherRef.current}
+                                        onOutgoingCall={setIsOutgoingCall}
+                                        messages={messages}
+                                        onDeleteConversation={async () => {}}
+                                        isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                        onArchiveConversation={handleArchiveConversation}
+                                        onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
+                                    />
+                                </div>
 
                                 {isLoadingMessages ? (
                                     <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -911,21 +925,24 @@ export default function ChatPage() {
                                         isDeletingMessage={isDeletingMessage}
                                         messagesContainerRef={messagesContainerRef}
                                         messagesEndRef={messagesEndRef}
+                                        typingUsers={typingUsers}
                                     />
                                 )}
 
-                                <MessageInput
-                                    newMsg={newMsg}
-                                    setNewMsg={setNewMsg}
-                                    onSend={sendMessage}
-                                    fileInputRef={fileInputRef}
-                                    handleFileSelect={handleFileSelect}
-                                    selectedFile={selectedFile}
-                                    removeSelectedFile={removeSelectedFile}
-                                    isUploading={isUploading}
-                                    conversationId={selectedConv}
-                                    user={user}
-                                />
+                                <div className="sticky bottom-0 z-20">
+                                    <MessageInput
+                                        newMsg={newMsg}
+                                        setNewMsg={setNewMsg}
+                                        onSend={sendMessage}
+                                        fileInputRef={fileInputRef}
+                                        handleFileSelect={handleFileSelect}
+                                        selectedFile={selectedFile}
+                                        removeSelectedFile={removeSelectedFile}
+                                        isUploading={isUploading}
+                                        conversationId={selectedConv}
+                                        user={user}
+                                    />
+                                </div>
                             </>
                         ) : (
                             <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">

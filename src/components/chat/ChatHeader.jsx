@@ -119,16 +119,6 @@ export default function ChatHeader({
               </span>
             )}
           </div>
-          {typingUsers.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-2 mt-2">
-              <span className="flex space-x-1">
-                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
-                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></span>
-                <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
-              </span>
-              {typingUsers.join(", ")} is typing...
-            </p>
-          )}
         </div>
         <div className="flex gap-2 text-gray-600 dark:text-gray-300 items-center">
           {/* Search Bar */}

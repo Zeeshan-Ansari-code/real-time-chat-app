@@ -14,7 +14,8 @@ export default function MessageList({
   isTranslatingMessage,
   isDeletingMessage,
   messagesContainerRef,
-  messagesEndRef
+  messagesEndRef,
+  typingUsers = []
 }) {
   // Store callback in ref to avoid dependency issues
   const onToggleRef = useRef(onToggleMessageSelection);
@@ -74,6 +75,7 @@ export default function MessageList({
     <div
       ref={messagesContainerRef}
       className="flex-1 overflow-y-auto p-5 lg:p-6 space-y-4 bg-gradient-to-b from-white via-blue-50/30 to-blue-100/30 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)" }}
     >
       {messages.length === 0 && (
         <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
@@ -99,6 +101,18 @@ export default function MessageList({
           />
         </div>
       ))}
+      {typingUsers.length > 0 && (
+        <div className="message-item flex">
+          <div className="max-w-xs md:max-w-sm lg:max-w-md px-4 py-2 rounded-2xl bg-white/90 dark:bg-gray-800/90 shadow text-blue-700 dark:text-blue-200 text-xs font-medium flex items-center gap-2 border border-blue-100 dark:border-blue-900/50">
+            <span className="flex space-x-1">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></span>
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></span>
+            </span>
+            {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
+          </div>
+        </div>
+      )}
       <div ref={messagesEndRef} />
     </div>
   );
