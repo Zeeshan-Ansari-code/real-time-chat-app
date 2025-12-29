@@ -86,22 +86,30 @@ export default function MessageList({
           </p>
         </div>
       )}
-      {messages.map((m) => (
-        <div key={m._id} className="message-item">
-          <MessageItem
-            message={m}
-            isOwnMessage={m.sender._id === user.id}
-            isSelected={selectedMessages.has(m._id)}
-            onSelect={onToggleMessageSelection}
-            onTranslate={onTranslateMessage}
-            onDelete={onDeleteMessage}
-            formatFileSize={formatFileSize}
-            otherUserId={otherUserId}
-            isTranslatingMessage={isTranslatingMessage}
-            isDeletingMessage={isDeletingMessage}
-          />
-        </div>
-      ))}
+      {messages.map((m) => {
+        if (!m || !m._id) return null; // Skip invalid messages
+        
+        // Safe sender check - handle null/undefined sender
+        const senderId = m.sender?._id || m.sender || null;
+        const isOwnMessage = senderId && user?.id ? String(senderId) === String(user.id) : false;
+        
+        return (
+          <div key={m._id} className="message-item">
+            <MessageItem
+              message={m}
+              isOwnMessage={isOwnMessage}
+              isSelected={selectedMessages.has(m._id)}
+              onSelect={onToggleMessageSelection}
+              onTranslate={onTranslateMessage}
+              onDelete={onDeleteMessage}
+              formatFileSize={formatFileSize}
+              otherUserId={otherUserId}
+              isTranslatingMessage={isTranslatingMessage}
+              isDeletingMessage={isDeletingMessage}
+            />
+          </div>
+        );
+      })}
       {isAIGenerating && (
         <div className="message-item flex">
           <div className="max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 shadow-sm border border-purple-200/50 dark:border-purple-800/30">
