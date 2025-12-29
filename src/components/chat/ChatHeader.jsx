@@ -23,6 +23,7 @@ export default function ChatHeader({
   onBackMobile,
   showBackButton = false
 }) {
+  const isAIChat = conversationId === "ai-chat" || otherUser?._id === "ai-assistant";
   const [showSearch, setShowSearch] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -286,13 +287,15 @@ export default function ChatHeader({
             )}
           </div>
 
-          <CallButton
-            conversationId={conversationId}
-            otherUser={otherUser}
-            user={user}
-            pusherRef={pusherRef}
-            onOutgoingCall={onOutgoingCall}
-          />
+          {!isAIChat && (
+            <CallButton
+              conversationId={conversationId}
+              otherUser={otherUser}
+              user={user}
+              pusherRef={pusherRef}
+              onOutgoingCall={onOutgoingCall}
+            />
+          )}
         </div>
       </div>
     </div>

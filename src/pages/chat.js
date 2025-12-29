@@ -41,6 +41,8 @@ export default function ChatPage() {
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [showSidebar, setShowSidebar] = useState(true);
+    const [isAILoading, setIsAILoading] = useState(false);
+    const [aiConversationId, setAiConversationId] = useState(null);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -394,6 +396,40 @@ export default function ChatPage() {
     }, []); // rely on ref to avoid stale closure
 
     const loadMessages = async (convId) => {
+        // Handle AI chat
+        if (convId === "ai-chat") {
+            setIsLoadingMessages(true);
+            try {
+                // Try to find existing AI conversation
+                const res = await axios.get(`/api/conversations?userId=${user.id}`);
+                const allConvs = res.data || [];
+                const aiConv = allConvs.find(c => {
+                    const otherUser = c.participants?.find(p => {
+                        const userId = p._id || p;
+                        const userEmail = p.email;
+                        return userEmail === "ai@assistant.com" || userId === "ai-assistant";
+                    });
+                    return otherUser !== undefined;
+                });
+                
+                if (aiConv) {
+                    setAiConversationId(aiConv._id);
+                    const messagesRes = await axios.get(`/api/messages/${aiConv._id}`);
+                    setMessages(messagesRes.data);
+                } else {
+                    setMessages([]);
+                    setAiConversationId(null);
+                }
+                setTimeout(() => scrollToBottom(), 0);
+            } catch (error) {
+                console.error("Error loading AI messages:", error);
+                setMessages([]);
+            } finally {
+                setIsLoadingMessages(false);
+            }
+            return;
+        }
+
         setIsLoadingMessages(true);
         try {
             const res = await axios.get(`/api/messages/${convId}`);
@@ -491,6 +527,64 @@ export default function ChatPage() {
         if (!newMsg.trim() && !selectedFile) return;
         if (!selectedConv || !user) return;
 
+        // Handle AI chat
+        if (selectedConv === "ai-chat") {
+            if (!newMsg.trim()) return; // AI chat doesn't support files yet
+            
+            setIsAILoading(true);
+            const userMessageText = newMsg.trim();
+            setNewMsg(""); // Clear input immediately
+            
+            try {
+                // Add user message optimistically
+                const tempUserMessage = {
+                    _id: `temp-${Date.now()}`,
+                    text: userMessageText,
+                    sender: { _id: user.id, name: user.name, email: user.email },
+                    conversation: aiConversationId || "ai-chat",
+                    createdAt: new Date(),
+                    seenBy: [user.id],
+                };
+                setMessages((prev) => [...prev, tempUserMessage]);
+                scrollToBottom();
+
+                // Call AI API
+                const response = await axios.post('/api/ai/chat', {
+                    conversationId: aiConversationId || "ai-chat",
+                    message: userMessageText,
+                    userId: user.id,
+                });
+
+                // Remove temp message and add real messages
+                setMessages((prev) => {
+                    const filtered = prev.filter(m => m._id !== tempUserMessage._id);
+                    return [...filtered, response.data.userMessage, response.data.aiMessage];
+                });
+
+                // Update conversation ID if it was created
+                if (response.data.conversationId) {
+                    setAiConversationId(response.data.conversationId);
+                }
+
+                // Reload conversations to show AI chat in list
+                try {
+                    const convs = await axios.get(`/api/conversations?userId=${user.id}`);
+                    setConversations(convs.data);
+                } catch (_) {}
+
+                setTimeout(() => scrollToBottom(), 100);
+            } catch (error) {
+                console.error("AI chat error:", error);
+                // Remove temp message on error
+                setMessages((prev) => prev.filter(m => !m._id?.startsWith('temp-')));
+                alert("Failed to send message to AI. Please try again.");
+            } finally {
+                setIsAILoading(false);
+            }
+            return;
+        }
+
+        // Regular message sending
         try {
             const messageData = {
                 senderId: user.id,
@@ -556,7 +650,12 @@ export default function ChatPage() {
         if (isMobile) {
             setShowSidebar(false);
         }
-        loadMessages(convId);
+        if (convId === "ai-chat") {
+            // Don't set up Pusher channels for AI chat
+            loadMessages(convId);
+        } else {
+            loadMessages(convId);
+        }
     };
 
     const handleBackToList = () => {
@@ -736,6 +835,13 @@ export default function ChatPage() {
         return () => clearTimeout(id);
     }, [selectedConv]);
 
+    // Scroll to bottom when AI starts generating
+    useEffect(() => {
+        if (isAILoading && selectedConv === "ai-chat") {
+            setTimeout(() => scrollToBottom(), 100);
+        }
+    }, [isAILoading, selectedConv]);
+
     if (!user) {
         return (
             <div className={`${dark ? "dark" : ""} h-screen flex items-center justify-center bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
@@ -747,13 +853,41 @@ export default function ChatPage() {
         );
     }
 
-    // Find otherUser from either regular or archived conversations
-    const selectedConversation = conversations.find((c) => c._id === selectedConv) 
-        || archivedConversations.find((c) => c._id === selectedConv);
-    const otherUser = selectedConversation?.participants.find((p) => p._id !== user.id);
-
-    const isOtherOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
-    const otherUserId = otherUser?._id;
+    // Find otherUser from either regular or archived conversations, or handle AI chat
+    let selectedConversation = null;
+    let otherUser = null;
+    let isOtherOnline = false;
+    let otherUserId = null;
+    
+    if (selectedConv === "ai-chat") {
+        // AI chat - try to find AI user from conversation or create virtual object
+        const aiConv = conversations.find(c => {
+            const otherUser = c.participants?.find(p => {
+                const userEmail = p.email;
+                return userEmail === "ai@assistant.com";
+            });
+            return otherUser !== undefined;
+        });
+        
+        if (aiConv) {
+            otherUser = aiConv.participants.find(p => p.email === "ai@assistant.com");
+        } else {
+            // Virtual AI user object if conversation not loaded yet
+            otherUser = {
+                _id: "ai-assistant",
+                name: "AI Assistant",
+                email: "ai@assistant.com"
+            };
+        }
+        isOtherOnline = true; // AI is always "online"
+        otherUserId = otherUser._id || "ai-assistant";
+    } else {
+        selectedConversation = conversations.find((c) => c._id === selectedConv) 
+            || archivedConversations.find((c) => c._id === selectedConv);
+        otherUser = selectedConversation?.participants.find((p) => p._id !== user.id);
+        isOtherOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
+        otherUserId = otherUser?._id;
+    }
 
     return (
         <div className={`${dark ? "dark" : ""} h-screen flex flex-col lg:flex-row bg-gradient-to-br from-white via-blue-50/40 to-blue-100/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-900`}>
@@ -832,6 +966,7 @@ export default function ChatPage() {
                                     messagesContainerRef={messagesContainerRef}
                                     messagesEndRef={messagesEndRef}
                                     typingUsers={typingUsers}
+                                    isAIGenerating={isAILoading && selectedConv === "ai-chat"}
                                 />
                                     )}
 
@@ -844,9 +979,10 @@ export default function ChatPage() {
                                             handleFileSelect={handleFileSelect}
                                             selectedFile={selectedFile}
                                             removeSelectedFile={removeSelectedFile}
-                                            isUploading={isUploading}
+                                            isUploading={isUploading || isAILoading}
                                             conversationId={selectedConv}
                                             user={user}
+                                            isAIChat={selectedConv === "ai-chat"}
                                         />
                                     </div>
                                 </>
@@ -926,6 +1062,7 @@ export default function ChatPage() {
                                         messagesContainerRef={messagesContainerRef}
                                         messagesEndRef={messagesEndRef}
                                         typingUsers={typingUsers}
+                                        isAIGenerating={isAILoading && selectedConv === "ai-chat"}
                                     />
                                 )}
 
@@ -938,9 +1075,10 @@ export default function ChatPage() {
                                         handleFileSelect={handleFileSelect}
                                         selectedFile={selectedFile}
                                         removeSelectedFile={removeSelectedFile}
-                                        isUploading={isUploading}
+                                        isUploading={isUploading || isAILoading}
                                         conversationId={selectedConv}
                                         user={user}
+                                        isAIChat={selectedConv === "ai-chat"}
                                     />
                                 </div>
                             </>

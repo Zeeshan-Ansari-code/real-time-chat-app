@@ -92,6 +92,46 @@ export default function Sidebar({
           </div>
         )}
       </div>
+      {/* AI Chat Button */}
+      <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-800">
+        <button
+          onClick={() => onSelectConversation("ai-chat")}
+          className={`w-full p-3 rounded-xl transition-all duration-200 group shadow-sm border ${
+            selectedConv === "ai-chat"
+              ? "bg-gradient-to-r from-purple-50 to-purple-100/50 dark:from-purple-900/30 dark:to-purple-800/20 border-purple-200/50 dark:border-purple-800/50"
+              : "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 border-transparent"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="relative flex-shrink-0">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md ${
+                selectedConv === "ai-chat"
+                  ? "bg-gradient-to-br from-purple-500 to-purple-600"
+                  : "bg-white/20"
+              }`}>
+                🤖
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className={`font-semibold text-sm ${
+                selectedConv === "ai-chat"
+                  ? "text-purple-900 dark:text-purple-100"
+                  : "text-white"
+              }`}>
+                AI Assistant
+              </p>
+              <p className={`text-xs ${
+                selectedConv === "ai-chat"
+                  ? "text-purple-700 dark:text-purple-300"
+                  : "text-white/80"
+              }`}>
+                Chat with AI
+              </p>
+            </div>
+          </div>
+        </button>
+      </div>
+
       {/* Conversations List */}
       <div
         className="flex-1 min-h-0 overflow-y-auto px-2 py-2"
@@ -113,7 +153,7 @@ export default function Sidebar({
           </div>
         ) : (
           <ul className="space-y-0">
-            {conversations.length === 0 && archivedConversations?.length === 0 && (
+            {conversations.length === 0 && archivedConversations?.length === 0 && selectedConv !== "ai-chat" && (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 dark:text-gray-500 p-6">
                 <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3">
                   <Search className="w-8 h-8 text-gray-300 dark:text-gray-600" />
@@ -125,6 +165,12 @@ export default function Sidebar({
             {conversations.map((c) => {
               if (!c.participants || c.participants.length === 0) return null;
               const otherUser = c.participants.find((p) => p._id !== user.id);
+              
+              // Skip AI conversations - they're shown as the special button at top
+              if (otherUser?.email === "ai@assistant.com" || otherUser?._id === "ai-assistant") {
+                return null;
+              }
+              
               const isOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
 
               return (
@@ -209,6 +255,12 @@ export default function Sidebar({
                   const pId = p._id || p;
                   return pId.toString() !== user.id.toString();
                 });
+                
+                // Skip AI conversations in archived list too
+                if (otherUser?.email === "ai@assistant.com" || otherUser?._id === "ai-assistant") {
+                  return null;
+                }
+                
                 const otherUserId = otherUser?._id || otherUser;
                 const isOnline = otherUserId ? onlineUsers.some((u) => u.id === otherUserId.toString()) : false;
 

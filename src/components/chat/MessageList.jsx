@@ -15,7 +15,8 @@ export default function MessageList({
   isDeletingMessage,
   messagesContainerRef,
   messagesEndRef,
-  typingUsers = []
+  typingUsers = [],
+  isAIGenerating = false
 }) {
   // Store callback in ref to avoid dependency issues
   const onToggleRef = useRef(onToggleMessageSelection);
@@ -101,6 +102,31 @@ export default function MessageList({
           />
         </div>
       ))}
+      {isAIGenerating && (
+        <div className="message-item flex">
+          <div className="max-w-xs md:max-w-sm lg:max-w-md px-4 py-3 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-900/20 dark:to-purple-800/10 shadow-sm border border-purple-200/50 dark:border-purple-800/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                AI
+              </div>
+              <span className="text-xs font-medium text-purple-700 dark:text-purple-300">AI Assistant</span>
+            </div>
+            <div className="space-y-2">
+              <div className="h-3 bg-purple-200/50 dark:bg-purple-800/30 rounded-lg animate-pulse" style={{ width: "85%" }}></div>
+              <div className="h-3 bg-purple-200/50 dark:bg-purple-800/30 rounded-lg animate-pulse" style={{ width: "70%" }}></div>
+              <div className="h-3 bg-purple-200/50 dark:bg-purple-800/30 rounded-lg animate-pulse" style={{ width: "60%" }}></div>
+            </div>
+            <div className="flex items-center gap-1 mt-2">
+              <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">Generating</span>
+              <span className="flex space-x-1">
+                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce"></span>
+                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></span>
+                <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {typingUsers.length > 0 && (
         <div className="message-item flex">
           <div className="max-w-xs md:max-w-sm lg:max-w-md px-4 py-2 rounded-2xl bg-white/90 dark:bg-gray-800/90 shadow text-blue-700 dark:text-blue-200 text-xs font-medium flex items-center gap-2 border border-blue-100 dark:border-blue-900/50">
