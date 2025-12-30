@@ -14,8 +14,10 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   const [pusher, setPusher] = useState(existingPusherRef || null);
   const [isMuted, setIsMuted] = useState(false);
   const [hasProcessedAnswer, setHasProcessedAnswer] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(true);
   const [localStreamState, setLocalStreamState] = useState(null);
+  const [facingMode, setFacingMode] = useState("user"); // "user" = front, "environment" = back
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [currentCameraId, setCurrentCameraId] = useState(null);
 
   const {
     pcRef,
@@ -77,18 +79,48 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     }
   }, [isIncoming, incomingOffer, otherUser]);
 
+  // Enumerate cameras on mount
+  useEffect(() => {
+    const enumerateCameras = async () => {
+      try {
+        // Request permission first to get device labels
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        setAvailableCameras(videoDevices);
+        if (videoDevices.length > 0 && !currentCameraId) {
+          setCurrentCameraId(videoDevices[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Error enumerating cameras:", error);
+      }
+    };
+    enumerateCameras();
+  }, []);
+
   // Start local stream when modal opens in idle state
   useEffect(() => {
     if (status === "idle" && !isIncoming && !localStreamRef.current) {
       let cancelled = false;
       const startPreview = async () => {
         try {
+          // Try to use deviceId if available, otherwise use facingMode
+          const videoConstraints = currentCameraId && availableCameras.length > 0
+            ? {
+                deviceId: { ideal: currentCameraId },
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 },
+                frameRate: { ideal: 30, min: 15 }
+              }
+            : {
+                facingMode: { ideal: facingMode },
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 },
+                frameRate: { ideal: 30, min: 15 }
+              };
+
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              width: { ideal: 1280, min: 640 },
-              height: { ideal: 720, min: 480 },
-              frameRate: { ideal: 30, min: 15 }
-            },
+            video: videoConstraints,
             audio: {
               echoCancellation: true,
               noiseSuppression: true,
@@ -102,10 +134,21 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
           }
           localStreamRef.current = stream;
           setLocalStreamState(stream); // Trigger re-render with stream
+          
+          // Store current camera ID from the track
+          const videoTrack = stream.getVideoTracks()[0];
+          if (videoTrack) {
+            const settings = videoTrack.getSettings();
+            if (settings.deviceId) {
+              setCurrentCameraId(settings.deviceId);
+            }
+          }
+          
           if (localVideoRef.current) {
             videoUtils.setupVideoElement(localVideoRef.current, stream, "Local");
           }
         } catch (error) {
+          console.error("Error starting preview:", error);
           setLocalStreamState(null);
         }
       };
@@ -115,7 +158,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
         setLocalStreamState(null);
       };
     }
-  }, [status, isIncoming]); // videoUtils is stable, no need to include
+  }, [status, isIncoming, facingMode, currentCameraId, availableCameras.length]); // videoUtils is stable, no need to include
 
   useEffect(() => () => cleanup(), []);
 
@@ -135,7 +178,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     setStatus("connecting");
     
     try {
-      const rtc = await createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, null, setStatus);
+      const rtc = await createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, null, setStatus, facingMode);
 
       if (!pcRef.current?.rtc) {
         throw new Error("Peer connection not properly stored");
@@ -169,7 +212,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
 
     setStatus("connecting");
     try {
-      const rtc = await createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, null, setStatus);
+      const rtc = await createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, null, setStatus, facingMode);
        
       await new Promise(resolve => setTimeout(resolve, 300));
        
@@ -256,8 +299,201 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
 
   function toggleMute() {
     if (!localStreamRef.current) return;
-    localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
-    setIsMuted((m) => !m);
+    
+    const audioTracks = localStreamRef.current.getAudioTracks();
+    if (audioTracks.length === 0) {
+      console.warn("No audio tracks found");
+      return;
+    }
+    
+    // Get current state from the first audio track
+    const currentlyEnabled = audioTracks[0].enabled;
+    const newMutedState = !currentlyEnabled;
+    
+    // Toggle all audio tracks
+    audioTracks.forEach((t) => {
+      t.enabled = newMutedState;
+      console.log(`Audio track ${t.id} enabled: ${newMutedState}`);
+    });
+    
+    // Update state - if tracks are enabled, we're NOT muted
+    setIsMuted(!newMutedState);
+    
+    // Also update peer connection senders if in call
+    if (pcRef.current?.rtc) {
+      const senders = pcRef.current.rtc.getSenders();
+      senders.forEach(sender => {
+        if (sender.track && sender.track.kind === 'audio') {
+          // The track replacement is handled automatically when we change enabled state
+          // But we can also replace the track if needed
+          if (sender.track !== audioTracks[0]) {
+            sender.replaceTrack(audioTracks[0]).catch(err => {
+              console.error("Error replacing audio track in peer connection:", err);
+            });
+          }
+        }
+      });
+    }
+  }
+
+  async function switchCamera() {
+    if (!localStreamRef.current) return;
+    
+    try {
+      // First try using facingMode (more reliable on mobile)
+      const newFacingMode = facingMode === "user" ? "environment" : "user";
+      
+      // Get new video stream with the selected camera
+      // Use facingMode as string (not object) for better mobile compatibility
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: newFacingMode,
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 },
+          frameRate: { ideal: 30, min: 15 }
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: { ideal: 48000, min: 22050 }
+        }
+      });
+
+      // Get the old and new video tracks
+      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      if (!newVideoTrack) {
+        throw new Error("Failed to get new video track");
+      }
+
+      // If peer connection exists (during call), replace the track FIRST
+      if (pcRef.current?.rtc) {
+        const sender = pcRef.current.rtc.getSenders().find(s => 
+          s.track && s.track.kind === "video"
+        );
+        
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      // Update local stream - replace the track
+      if (oldVideoTrack) {
+        localStreamRef.current.removeTrack(oldVideoTrack);
+      }
+      localStreamRef.current.addTrack(newVideoTrack);
+
+      // Update video element with the new stream
+      if (localVideoRef.current) {
+        videoUtils.setupVideoElement(localVideoRef.current, localStreamRef.current, "Local");
+      }
+
+      // Stop old video track after everything is set up
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+      }
+
+      // Update state
+      setFacingMode(newFacingMode);
+      setLocalStreamState(localStreamRef.current);
+      
+      // Store current camera ID from the new track
+      const settings = newVideoTrack.getSettings();
+      if (settings.deviceId) {
+        setCurrentCameraId(settings.deviceId);
+      }
+
+      // Stop other tracks from new stream (we only need the video track)
+      newStream.getAudioTracks().forEach(t => t.stop());
+    } catch (error) {
+      console.error("Error switching camera with facingMode:", error);
+      
+      // Fallback: Try device enumeration approach
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        if (videoDevices.length < 2) {
+          console.warn("Only one camera available");
+          return;
+        }
+
+        // Get current video track to find current camera
+        const currentVideoTrack = localStreamRef.current.getVideoTracks()[0];
+        const currentSettings = currentVideoTrack?.getSettings();
+        const currentDeviceId = currentSettings?.deviceId;
+
+        // Find the other camera
+        const targetDevice = videoDevices.find(device => device.deviceId !== currentDeviceId);
+        
+        if (!targetDevice) {
+          console.warn("Could not find alternative camera");
+          return;
+        }
+
+        // Get new stream with deviceId
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { ideal: targetDevice.deviceId },
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            frameRate: { ideal: 30, min: 15 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: { ideal: 48000, min: 22050 }
+          }
+        });
+
+        const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+        const newVideoTrack = newStream.getVideoTracks()[0];
+
+        // Replace in peer connection if in call
+        if (pcRef.current?.rtc) {
+          const sender = pcRef.current.rtc.getSenders().find(s => 
+            s.track && s.track.kind === "video"
+          );
+          if (sender) {
+            await sender.replaceTrack(newVideoTrack);
+          }
+        }
+
+        // Update local stream
+        if (oldVideoTrack) {
+          localStreamRef.current.removeTrack(oldVideoTrack);
+        }
+        localStreamRef.current.addTrack(newVideoTrack);
+
+        // Update video element
+        if (localVideoRef.current) {
+          videoUtils.setupVideoElement(localVideoRef.current, localStreamRef.current, "Local");
+        }
+
+        // Stop old video track after everything is set up
+        if (oldVideoTrack) {
+          oldVideoTrack.stop();
+        }
+
+        setLocalStreamState(localStreamRef.current);
+        setCurrentCameraId(targetDevice.deviceId);
+        
+        // Update facing mode based on device label
+        const deviceLabel = targetDevice.label?.toLowerCase() || '';
+        if (deviceLabel.includes('back') || deviceLabel.includes('rear') || deviceLabel.includes('environment')) {
+          setFacingMode("environment");
+        } else {
+          setFacingMode("user");
+        }
+
+        newStream.getAudioTracks().forEach(t => t.stop());
+      } catch (fallbackError) {
+        console.error("Fallback camera switch also failed:", fallbackError);
+      }
+    }
   }
 
   // Full screen call UI
@@ -337,6 +573,8 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
               isIncoming={isIncoming}
               onAccept={acceptCall}
               onReject={rejectCall}
+              onSwitchCamera={switchCamera}
+              canSwitchCamera={status === "in-call" && pcRef.current?.rtc !== null && availableCameras.length >= 2}
             />
           </div>
         </div>
@@ -411,6 +649,8 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
                   isIncoming={isIncoming}
                   onAccept={acceptCall}
                   onReject={rejectCall}
+                  onSwitchCamera={switchCamera}
+                  canSwitchCamera={status === "idle" && localStreamRef.current !== null && availableCameras.length >= 2}
                 />
               </div>
             </>

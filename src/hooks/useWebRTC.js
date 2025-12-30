@@ -54,16 +54,27 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
     }
   };
 
-  async function startLocalStream() {
+  async function startLocalStream(facingMode = "user", deviceId = null) {
     if (localStreamRef.current) return localStreamRef.current;
 
     try {
+      // Prefer deviceId if provided (more reliable on mobile)
+      const videoConstraints = deviceId
+        ? {
+            deviceId: { ideal: deviceId },
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            frameRate: { ideal: 30, min: 15 }
+          }
+        : {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280, min: 640 },
+            height: { ideal: 720, min: 480 },
+            frameRate: { ideal: 30, min: 15 }
+          };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280, min: 640 },
-          height: { ideal: 720, min: 480 },
-          frameRate: { ideal: 30, min: 15 }
-        },
+        video: videoConstraints,
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -115,7 +126,7 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
     pendingCandidatesRef.current = [];
   }
 
-  async function createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, onRemoteStream, setStatus) {
+  async function createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, onRemoteStream, setStatus, facingMode = "user", deviceId = null) {
     try {
       const rtc = new RTCPeerConnection(CONFIG);
 
@@ -134,7 +145,7 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
       rtc.onsignalingstatechange = () => {};
       rtc.oniceconnectionstatechange = () => {};
 
-      const localStream = await startLocalStream();
+      const localStream = await startLocalStream(facingMode, deviceId);
       const tracks = localStream.getTracks();
 
       tracks.forEach((track) => {
