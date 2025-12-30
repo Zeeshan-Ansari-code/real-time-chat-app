@@ -163,15 +163,15 @@ export default function Sidebar({
               </div>
             )}
             {conversations.map((c) => {
-              if (!c.participants || c.participants.length === 0) return null;
-              const otherUser = c.participants.find((p) => p._id !== user.id);
+              if (!c?.participants || c?.participants?.length === 0) return null;
+              const otherUser = c?.participants?.find((p) => p?._id !== user?.id);
               
               // Skip AI conversations - they're shown as the special button at top
               if (otherUser?.email === "ai@assistant.com" || otherUser?._id === "ai-assistant") {
                 return null;
               }
               
-              const isOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
+              const isOnline = otherUser ? onlineUsers.some((u) => u?.id === otherUser?._id) : false;
 
               return (
                 <li
@@ -205,9 +205,9 @@ export default function Sidebar({
                           }`}>
                           {otherUser?.name || "Unknown User"}
                         </p>
-                        {c.unreadCount > 0 && (
+                        {(c?.unreadCount || 0) > 0 && (
                           <span className="ml-2 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full bg-blue-500 text-white text-xs font-bold shadow-sm">
-                            {c.unreadCount}
+                            {c?.unreadCount}
                           </span>
                         )}
                       </div>
@@ -250,10 +250,10 @@ export default function Sidebar({
           {archivedConversations && archivedConversations.length > 0 ? (
             <ul className="max-h-64 overflow-y-auto px-2 py-2">
               {archivedConversations.map((c) => {
-                if (!c.participants || c.participants.length === 0) return null;
-                const otherUser = c.participants.find((p) => {
-                  const pId = p._id || p;
-                  return pId.toString() !== user.id.toString();
+                if (!c?.participants || c?.participants?.length === 0) return null;
+                const otherUser = c?.participants?.find((p) => {
+                  const pId = p?._id || p;
+                  return pId?.toString() !== user?.id?.toString();
                 });
                 
                 // Skip AI conversations in archived list too
@@ -262,7 +262,7 @@ export default function Sidebar({
                 }
                 
                 const otherUserId = otherUser?._id || otherUser;
-                const isOnline = otherUserId ? onlineUsers.some((u) => u.id === otherUserId.toString()) : false;
+                const isOnline = otherUserId ? onlineUsers.some((u) => u?.id === otherUserId?.toString()) : false;
 
                 return (
                   <li

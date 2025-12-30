@@ -74,7 +74,7 @@ export default function ProfilePage() {
     );
   }
 
-  const isOwnProfile = currentUser?.id === user._id || currentUser?.id === user.id;
+  const isOwnProfile = currentUser?.id === user?._id || currentUser?.id === user?.id;
 
   return (
     <div className={`${dark ? "dark" : ""} min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900`}>
@@ -96,7 +96,7 @@ export default function ProfilePage() {
           {/* Avatar and Name */}
           <div className="flex flex-col items-center mb-8">
             <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-3xl sm:text-4xl shadow-lg mb-4">
-              {user.name?.[0]?.toUpperCase() || "?"}
+              {user?.name?.[0]?.toUpperCase() || "?"}
             </div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{user.name || "Unknown User"}</h2>
             {isOwnProfile && (

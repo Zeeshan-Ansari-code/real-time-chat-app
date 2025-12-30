@@ -23,7 +23,7 @@ export default function SignupPage() {
             localStorage.setItem("user", JSON.stringify(loginRes.data));
             router.push("/chat");
         } catch (err) {
-            setError(err.response?.data?.error || "Signup failed");
+            setError(err?.response?.data?.error || "Signup failed");
             setIsLoading(false);
         }
     };

@@ -20,12 +20,31 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
+      const limit = parseInt(req.query.limit) || 50; // Default 50 messages
+      const skip = parseInt(req.query.skip) || 0;
+      const sortOrder = req.query.sort === "asc" ? 1 : -1; // Default: newest first
+
+      // Optimized query with pagination
       const messages = await Message.find({ conversation: conversationId })
         .populate("sender", "name email")
         .populate("seenBy", "name email")
-        .sort({ createdAt: 1 });
+        .sort({ createdAt: sortOrder })
+        .limit(limit)
+        .skip(skip)
+        .lean(); // Use lean() for better performance
 
-      return res.status(200).json(messages);
+      // Get total count for pagination info
+      const totalCount = await Message.countDocuments({ conversation: conversationId });
+
+      return res.status(200).json({
+        messages: sortOrder === -1 ? messages.reverse() : messages, // Return in chronological order
+        pagination: {
+          total: totalCount,
+          limit,
+          skip,
+          hasMore: skip + limit < totalCount,
+        },
+      });
     } catch (err) {
       return res.status(500).json({ error: "Server error while fetching messages" });
     }

@@ -27,7 +27,7 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(res.data));
       router.push("/chat");
     } catch (err) {
-      setError(err.response?.data?.error || "Login failed");
+      setError(err?.response?.data?.error || "Login failed");
       setIsLoading(false);
     }
   };

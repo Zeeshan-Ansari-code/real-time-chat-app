@@ -25,34 +25,63 @@ export default async function handler(req, res) {
       let conversations;
       
       if (includeArchived === "true") {
-        // Get archived conversations: Find all Archive documents for this user, then get the conversations
-        const archives = await Archive.find({ user: userIdObj })
-          .select("conversation")
-          .lean();
-        
-        const archivedConversationIds = archives.map(a => a.conversation);
-        
-        if (archivedConversationIds.length === 0) {
-          conversations = [];
-        } else {
-          conversations = await Conversation.find({
-            _id: { $in: archivedConversationIds },
-            participants: userIdObj
-          })
-            .populate("participants", "name email")
-            .lean();
-        }
+        // Optimized: Use aggregation to join Archive and Conversation in one query
+        conversations = await Conversation.aggregate([
+          {
+            $lookup: {
+              from: "archives",
+              let: { convId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $eq: ["$conversation", "$$convId"] },
+                        { $eq: ["$user", userIdObj] }
+                      ]
+                    }
+                  }
+                }
+              ],
+              as: "archiveInfo"
+            }
+          },
+          {
+            $match: {
+              participants: userIdObj,
+              archiveInfo: { $ne: [] } // Only archived conversations
+            }
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "participants",
+              foreignField: "_id",
+              as: "participants"
+            }
+          },
+          {
+            $project: {
+              participants: {
+                _id: 1,
+                name: 1,
+                email: 1
+              },
+              createdAt: 1,
+              updatedAt: 1
+            }
+          }
+        ]);
       } else {
-        // Get non-archived conversations: Get all conversations for user, exclude archived ones
-        const archives = await Archive.find({ user: userIdObj })
+        // Optimized: Use aggregation to exclude archived conversations efficiently
+        const archivedIds = await Archive.find({ user: userIdObj })
           .select("conversation")
-          .lean();
-        
-        const archivedConversationIds = archives.map(a => a.conversation);
+          .lean()
+          .then(archives => archives?.map(a => a?.conversation) || []);
         
         const query = { participants: userIdObj };
-        if (archivedConversationIds.length > 0) {
-          query._id = { $nin: archivedConversationIds };
+        if (archivedIds.length > 0) {
+          query._id = { $nin: archivedIds };
         }
         
         conversations = await Conversation.find(query)
@@ -60,26 +89,75 @@ export default async function handler(req, res) {
           .lean();
       }
 
-      const decorated = await Promise.all(
-        conversations.map(async (conv) => {
-          const lastMessage = await Message.findOne({ conversation: conv._id })
-            .sort({ createdAt: -1 })
-            .populate("sender", "name email")
-            .lean();
+      // Optimize: Use aggregation pipeline for better performance
+      const conversationIds = conversations.map(c => c._id);
+      
+      // Get last messages for all conversations in one query
+      const lastMessagesMap = new Map();
+      if (conversationIds.length > 0) {
+        const lastMessages = await Message.aggregate([
+          { $match: { conversation: { $in: conversationIds } } },
+          { $sort: { createdAt: -1 } },
+          {
+            $group: {
+              _id: "$conversation",
+              lastMessage: { $first: "$$ROOT" },
+            },
+          },
+        ]);
 
-          const unreadCount = await Message.countDocuments({
-            conversation: conv._id,
-            sender: { $ne: userId },
-            seenBy: { $ne: userId },
-          });
+        // Populate sender for last messages
+        const populatedLastMessages = await Message.populate(lastMessages, {
+          path: "lastMessage.sender",
+          select: "name email",
+        });
 
-          return {
-            ...conv,
-            lastMessage,
-            unreadCount,
-          };
-        })
-      );
+        populatedLastMessages.forEach((item) => {
+          if (item?._id) {
+            lastMessagesMap.set(item._id.toString(), item?.lastMessage);
+          }
+        });
+      }
+
+      // Get unread counts for all conversations in one query
+      const unreadCountsMap = new Map();
+      if (conversationIds.length > 0) {
+        const unreadCounts = await Message.aggregate([
+          {
+            $match: {
+              conversation: { $in: conversationIds },
+              sender: { $ne: userIdObj },
+            },
+          },
+          {
+            $group: {
+              _id: "$conversation",
+              unreadCount: {
+                $sum: {
+                  $cond: [
+                    { $not: { $in: [userIdObj, "$seenBy"] } },
+                    1,
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ]);
+
+        unreadCounts.forEach((item) => {
+          if (item?._id) {
+            unreadCountsMap.set(item._id.toString(), item?.unreadCount || 0);
+          }
+        });
+      }
+
+      // Combine results
+      const decorated = conversations.map((conv) => ({
+        ...conv,
+        lastMessage: lastMessagesMap.get(conv?._id?.toString()) || null,
+        unreadCount: unreadCountsMap.get(conv?._id?.toString()) || 0,
+      }));
 
       return res.status(200).json(decorated);
     } catch (err) {

@@ -236,7 +236,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     await axios.post("/api/calls/hangup", {
       conversationId,
       from: user,
-      to: pcRef.current?.from || otherUser,
+      to: pcRef.current?.from || otherUser || null,
       reason: "rejected",
     }).catch(() => { });
     cleanup();

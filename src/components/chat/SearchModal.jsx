@@ -17,19 +17,19 @@ export default function SearchModal({ isOpen, onClose, messages, user }) {
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
+    const query = searchQuery?.toLowerCase()?.trim();
     const results = messages
-      .filter((msg) => {
-        if (!msg.text) return false;
-        return msg.text.toLowerCase().includes(query);
+      ?.filter((msg) => {
+        if (!msg?.text) return false;
+        return msg?.text?.toLowerCase()?.includes(query);
       })
-      .map((msg) => ({
+      ?.map((msg) => ({
         ...msg,
-        highlightedText: msg.text.replace(
+        highlightedText: msg?.text?.replace(
           new RegExp(`(${query})`, "gi"),
           "<mark>$1</mark>"
         ),
-      }));
+      })) || [];
 
     setSearchResults(results);
   }, [searchQuery, messages, isOpen]);

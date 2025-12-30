@@ -1,5 +1,6 @@
 import { connectDB } from "@/lib/mongoose";
 import User from "@/models/User";
+import mongoose from "mongoose";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -14,15 +15,32 @@ export default async function handler(req, res) {
       return res.status(200).json([]);
     }
 
-    const regex = new RegExp(q.trim(), "i");
-    const filter = userId
-      ? { _id: { $ne: userId }, name: regex }
-      : { name: regex };
+    const searchQuery = q.trim();
+    const userIdObj = userId ? new mongoose.Types.ObjectId(userId) : null;
 
-    const users = await User.find(filter)
-      .select("name email")
-      .limit(10)
-      .lean();
+    // Try text search first (faster if text index exists)
+    let users = [];
+    try {
+      const textFilter = userIdObj
+        ? { $text: { $search: searchQuery }, _id: { $ne: userIdObj } }
+        : { $text: { $search: searchQuery } };
+      
+      users = await User.find(textFilter)
+        .select("name email")
+        .limit(10)
+        .lean();
+    } catch (textSearchError) {
+      // Fallback to regex if text index doesn't exist
+      const regex = new RegExp(searchQuery, "i");
+      const filter = userIdObj
+        ? { _id: { $ne: userIdObj }, $or: [{ name: regex }, { email: regex }] }
+        : { $or: [{ name: regex }, { email: regex }] };
+
+      users = await User.find(filter)
+        .select("name email")
+        .limit(10)
+        .lean();
+    }
 
     res.status(200).json(users);
   } catch (err) {

@@ -16,7 +16,10 @@ export default function MessageList({
   messagesContainerRef,
   messagesEndRef,
   typingUsers = [],
-  isAIGenerating = false
+  isAIGenerating = false,
+  hasMoreMessages = false,
+  isLoadingMoreMessages = false,
+  onLoadMore = null
 }) {
   // Store callback in ref to avoid dependency issues
   const onToggleRef = useRef(onToggleMessageSelection);

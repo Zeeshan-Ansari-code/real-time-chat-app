@@ -61,19 +61,19 @@ export default function ChatHeader({
       return;
     }
 
-    const query = searchQuery.toLowerCase().trim();
+    const query = searchQuery?.toLowerCase()?.trim();
     const results = currentMessages
-      .filter((msg) => {
-        if (!msg.text) return false;
-        return msg.text.toLowerCase().includes(query);
+      ?.filter((msg) => {
+        if (!msg?.text) return false;
+        return msg?.text?.toLowerCase()?.includes(query);
       })
-      .map((msg) => ({
+      ?.map((msg) => ({
         ...msg,
-        highlightedText: msg.text.replace(
+        highlightedText: msg?.text?.replace(
           new RegExp(`(${query})`, "gi"),
           "<mark class='bg-yellow-300 dark:bg-yellow-600'>$1</mark>"
         ),
-      }));
+      })) || [];
 
     setSearchResults(results);
   }, [searchQuery]); // Only depend on searchQuery, use ref for messages
@@ -210,7 +210,7 @@ export default function ChatHeader({
                   <button
                     onClick={() => {
                       if (otherUser?._id || otherUser?.id) {
-                        window.location.href = `/profile/${otherUser._id || otherUser.id}`;
+                        window.location.href = `/profile/${otherUser?._id || otherUser?.id}`;
                       }
                       setShowMenu(false);
                     }}

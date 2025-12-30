@@ -32,10 +32,10 @@ export default async function handler(req, res) {
     }
 
     // Check if user is a participant
-    const isParticipant = conversation.participants.some(
+    const isParticipant = conversation?.participants?.some(
       (p) => {
-        const pId = p._id ? p._id.toString() : p.toString();
-        return pId === userId.toString();
+        const pId = p?._id ? p._id.toString() : p?.toString();
+        return pId === userId?.toString();
       }
     );
     if (!isParticipant) {

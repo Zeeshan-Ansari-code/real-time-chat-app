@@ -55,6 +55,8 @@ export default function MessageItem({
                       alt={message.fileName || 'Image'}
                       className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                       style={{ maxHeight: '200px' }}
+                      loading="lazy"
+                      decoding="async"
                       onError={() => setImageError(true)}
                     />
                   </a>
@@ -254,7 +256,7 @@ export default function MessageItem({
 
       {isOwnMessage && (
         <span className="text-[10px] text-gray-400 mr-2">
-          {Array.isArray(message.seenBy) && otherUserId && message.seenBy.some((s) => (s?._id || s) === otherUserId)
+          {Array.isArray(message?.seenBy) && otherUserId && message?.seenBy?.some((s) => (s?._id || s) === otherUserId)
             ? "Seen"
             : "Sent"}
         </span>

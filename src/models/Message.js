@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const MessageSchema = new mongoose.Schema(
   {
-    conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation" },
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    conversation: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", index: true },
+    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     text: String,
     lang: { type: String, default: null },
     seenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -15,6 +15,10 @@ const MessageSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Compound indexes for common queries
+MessageSchema.index({ conversation: 1, createdAt: -1 });
+MessageSchema.index({ conversation: 1, sender: 1, seenBy: 1 });
 
 export default mongoose.models.Message ||
   mongoose.model("Message", MessageSchema);

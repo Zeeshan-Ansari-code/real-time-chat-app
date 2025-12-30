@@ -7,7 +7,7 @@ export function useFileUpload() {
   const fileInputRef = useRef(null);
 
   const handleFileSelect = async (event) => {
-    const file = event.target.files[0];
+    const file = event?.target?.files?.[0];
     if (!file) return;
 
     if (file.size > 50 * 1024 * 1024) {
@@ -20,13 +20,26 @@ export function useFileUpload() {
       const formData = new FormData();
       formData.append('file', file);
 
+      // Use axios with onUploadProgress for progress tracking
       const response = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            // You can emit this progress to parent component if needed
+            // For now, we just track it internally
+          }
+        },
+        timeout: 120000, // 2 minutes timeout for large files
       });
 
       setSelectedFile(response.data);
     } catch (error) {
-      alert("Failed to upload file");
+      if (error.code === 'ECONNABORTED') {
+        alert("Upload timeout. Please try again with a smaller file.");
+      } else {
+        alert("Failed to upload file");
+      }
     } finally {
       setIsUploading(false);
     }

@@ -1,4 +1,14 @@
 import axios from "axios";
+import { connectDB } from "@/lib/mongoose";
+import mongoose from "mongoose";
+
+// Simple in-memory cache for translations (in production, use Redis)
+const translationCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCacheKey(q, source, target) {
+  return `${q}:${source}:${target}`;
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -13,6 +23,13 @@ export default async function handler(req, res) {
   // If source equals target, nothing to translate
   if (source !== 'auto' && source.toLowerCase() === target.toLowerCase()) {
     return res.status(200).json({ translatedText: q });
+  }
+
+  // Check cache first
+  const cacheKey = getCacheKey(q, source, target);
+  const cached = translationCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+    return res.status(200).json({ translatedText: cached.result, cached: true });
   }
 
   // Special handling for transliterated Hindi text
@@ -30,7 +47,9 @@ export default async function handler(req, res) {
       if (response.data && response.data[0] && response.data[0][0]) {
         const translatedText = response.data[0][0][0];
         if (translatedText && translatedText !== q) {
-          return res.status(200).json({ translatedText });
+          // Cache the result
+          translationCache.set(cacheKey, { result: translatedText, timestamp: Date.now() });
+          return res.status(200).json({ translatedText, cached: false });
         }
       }
     } catch (error) {
@@ -38,105 +57,90 @@ export default async function handler(req, res) {
     }
   }
 
-  // Service 1: Google Translate (via public proxy)
-  try {
-    const googleTranslateUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source === 'auto' ? 'auto' : source}&tl=${target}&dt=t&q=${encodeURIComponent(q)}`;
-    
-    const response = await axios.get(googleTranslateUrl, {
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-    
-    if (response.data && response.data[0] && response.data[0][0]) {
-      const translatedText = response.data[0][0][0];
-      if (translatedText && translatedText !== q) {
-        return res.status(200).json({ translatedText });
-      }
-    }
-    
-    // Check if Google Translate returned an error message
-    if (response.data && typeof response.data === 'string' && response.data.includes('distinct languages')) {
-      throw new Error('Google Translate rejected language pair');
-    }
-    
-  } catch (error) {
-    // Continue to next service
-  }
-
-  // Service 2: MyMemory (public, reliable)
-  try {
-    // For MyMemory, we need to specify a source language, so use 'en' as default for auto
-    const src = (source === 'auto') ? 'en' : source;
-    const pair = `${src}|${target}`.toLowerCase();
-    
-    const response = await axios.get("https://api.mymemory.translated.net/get", {
-      params: { 
-        q, 
-        langpair: pair 
-      }, 
-      timeout: 10000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-    
-    if (response.data?.responseData?.translatedText) {
-      const translatedText = response.data.responseData.translatedText;
-      return res.status(200).json({ translatedText });
-    } else if (response.data?.responseDetails) {
-      // Check if the error message contains the problematic text
-      if (response.data.responseDetails.includes('distinct languages')) {
-        // Try with a different source language if auto-detection fails
-        if (src === 'en') {
-          // Try with Spanish as source if English fails
-          const altPair = `es|${target}`;
-          const altResponse = await axios.get("https://api.mymemory.translated.net/get", {
-            params: { q, langpair: altPair }, 
-            timeout: 10000,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-          });
-          if (altResponse.data?.responseData?.translatedText) {
-            const translatedText = altResponse.data.responseData.translatedText;
-            return res.status(200).json({ translatedText });
-          }
+  // Optimize: Try multiple services in parallel for faster response
+  const src = (source === 'auto') ? 'en' : source;
+  const pair = `${src}|${target}`.toLowerCase();
+  
+  // Create parallel requests for faster translation
+  const translationPromises = [
+    // Service 1: Google Translate
+    axios.get(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source === 'auto' ? 'auto' : source}&tl=${target}&dt=t&q=${encodeURIComponent(q)}`,
+      {
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
       }
+    ).then(res => {
+      if (res.data && res.data[0] && res.data[0][0]) {
+        const text = res.data[0][0][0];
+        if (text && text !== q) return { service: 'google', text };
+      }
+      throw new Error('Invalid response');
+    }).catch(() => null),
+
+    // Service 2: MyMemory
+    axios.get("https://api.mymemory.translated.net/get", {
+      params: { q, langpair: pair },
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    }).then(res => {
+      if (res.data?.responseData?.translatedText) {
+        return { service: 'mymemory', text: res.data.responseData.translatedText };
+      }
+      throw new Error('Invalid response');
+    }).catch(() => null),
+
+    // Service 3: First LibreTranslate instance
+    axios.post(
+      "https://libretranslate.de/translate",
+      { q, source: source === 'auto' ? 'auto' : source, target, format: "text" },
+      { headers: { "Content-Type": "application/json" }, timeout: 8000 }
+    ).then(res => {
+      if (res.data?.translatedText) {
+        return { service: 'libretranslate', text: res.data.translatedText };
+      }
+      throw new Error('Invalid response');
+    }).catch(() => null),
+  ];
+
+  // Wait for first successful response
+  const results = await Promise.allSettled(translationPromises);
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value && result.value.text && result.value.text !== q) {
+      const translatedText = result.value.text;
+      // Cache the result
+      translationCache.set(cacheKey, { result: translatedText, timestamp: Date.now() });
+      return res.status(200).json({ translatedText, cached: false, service: result.value.service });
     }
-  } catch (error) {
-    // Continue to next service
   }
 
-  // Service 3: LibreTranslate (public instances)
-  const libreTranslateUrls = [
-    "https://libretranslate.de/translate",
+  // Fallback: Try remaining LibreTranslate instances in parallel
+  const remainingLibreUrls = [
     "https://translate.astian.org/translate",
     "https://translate.argosopentech.com/translate"
   ];
 
-  for (const url of libreTranslateUrls) {
-    try {
-      const response = await axios.post(
-        url,
-        { 
-          q, 
-          source: source === 'auto' ? 'auto' : source, 
-          target: target, 
-          format: "text" 
-        },
-        { 
-          headers: { "Content-Type": "application/json" }, 
-          timeout: 10000 
-        }
-      );
-      
-      if (response.data?.translatedText) {
-        const translatedText = response.data.translatedText;
-        return res.status(200).json({ translatedText });
+  const fallbackPromises = remainingLibreUrls.map(url =>
+    axios.post(
+      url,
+      { q, source: source === 'auto' ? 'auto' : source, target, format: "text" },
+      { headers: { "Content-Type": "application/json" }, timeout: 8000 }
+    ).then(res => {
+      if (res.data?.translatedText) {
+        return { service: 'libretranslate', text: res.data.translatedText };
       }
-    } catch (error) {
-      // Continue to next service
+      throw new Error('Invalid response');
+    }).catch(() => null)
+  );
+
+  const fallbackResults = await Promise.allSettled(fallbackPromises);
+  for (const result of fallbackResults) {
+    if (result.status === 'fulfilled' && result.value && result.value.text && result.value.text !== q) {
+      const translatedText = result.value.text;
+      translationCache.set(cacheKey, { result: translatedText, timestamp: Date.now() });
+      return res.status(200).json({ translatedText, cached: false, service: result.value.service });
     }
   }
 

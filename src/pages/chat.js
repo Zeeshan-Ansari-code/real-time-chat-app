@@ -43,6 +43,8 @@ export default function ChatPage() {
     const [showSidebar, setShowSidebar] = useState(true);
     const [isAILoading, setIsAILoading] = useState(false);
     const [aiConversationId, setAiConversationId] = useState(null);
+    const [hasMoreMessages, setHasMoreMessages] = useState(false);
+    const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -52,6 +54,11 @@ export default function ChatPage() {
     const selectedConvRef = useRef(null);
     const conversationsRef = useRef([]);
     const userRef = useRef(null);
+    
+    // Client-side cache for messages and conversations
+    const messagesCacheRef = useRef(new Map()); // conversationId -> { messages, timestamp }
+    const conversationsCacheRef = useRef(null);
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
     // Custom hooks
     const {
@@ -98,6 +105,45 @@ export default function ChatPage() {
             const load = async () => {
                 setIsLoadingChats(true);
                 try {
+                    // Check cache first
+                    const cacheKey = `conversations-${parsed.id}`;
+                    const cached = sessionStorage.getItem(cacheKey);
+                    const now = Date.now();
+                    
+                    if (cached) {
+                        try {
+                            const { data, timestamp } = JSON.parse(cached);
+                            if (now - timestamp < CACHE_TTL) {
+                                // Use cached data
+                                const regularList = data.regular || [];
+                                const archivedList = data.archived || [];
+                                setConversations(Array.from(new Map(regularList.map((c) => [c._id, c])).values()));
+                                setArchivedConversations(Array.from(new Map(archivedList.map((c) => [c._id, c])).values()));
+                                setIsLoadingChats(false);
+                                
+                                // Load fresh data in background
+                                Promise.all([
+                                    axios.get(`/api/conversations?userId=${parsed.id}`),
+                                    axios.get(`/api/conversations?userId=${parsed.id}&includeArchived=true`).catch(() => ({ data: [] }))
+                                ]).then(([regularRes, archivedRes]) => {
+                                    const regularList = Array.isArray(regularRes.data) ? regularRes.data : [];
+                                    const archivedList = Array.isArray(archivedRes.data) ? archivedRes.data : [];
+                                    setConversations(Array.from(new Map(regularList.map((c) => [c._id, c])).values()));
+                                    setArchivedConversations(Array.from(new Map(archivedList.map((c) => [c._id, c])).values()));
+                                    // Update cache
+                                    sessionStorage.setItem(cacheKey, JSON.stringify({
+                                        data: { regular: regularList, archived: archivedList },
+                                        timestamp: now
+                                    }));
+                                });
+                                return;
+                            }
+                        } catch (e) {
+                            // Cache invalid, continue to fetch
+                        }
+                    }
+                    
+                    // Fetch fresh data
                     const [regularRes, archivedRes] = await Promise.all([
                         axios.get(`/api/conversations?userId=${parsed.id}`),
                         axios.get(`/api/conversations?userId=${parsed.id}&includeArchived=true`).catch(() => ({ data: [] }))
@@ -106,6 +152,12 @@ export default function ChatPage() {
                     const archivedList = Array.isArray(archivedRes.data) ? archivedRes.data : [];
                     setConversations(Array.from(new Map(regularList.map((c) => [c._id, c])).values()));
                     setArchivedConversations(Array.from(new Map(archivedList.map((c) => [c._id, c])).values()));
+                    
+                    // Cache the result
+                    sessionStorage.setItem(cacheKey, JSON.stringify({
+                        data: { regular: regularList, archived: archivedList },
+                        timestamp: now
+                    }));
                 } finally {
                     setIsLoadingChats(false);
                 }
@@ -395,7 +447,7 @@ export default function ChatPage() {
         return () => window.removeEventListener("resize", handleResize);
     }, []); // rely on ref to avoid stale closure
 
-    const loadMessages = async (convId) => {
+    const loadMessages = async (convId, skip = 0) => {
         // Handle AI chat
         if (convId === "ai-chat") {
             setIsLoadingMessages(true);
@@ -404,18 +456,23 @@ export default function ChatPage() {
                 const res = await axios.get(`/api/conversations?userId=${user.id}`);
                 const allConvs = res.data || [];
                 const aiConv = allConvs.find(c => {
-                    const otherUser = c.participants?.find(p => {
-                        const userId = p._id || p;
-                        const userEmail = p.email;
+                    const otherUser = c?.participants?.find(p => {
+                        const userId = p?._id || p;
+                        const userEmail = p?.email;
                         return userEmail === "ai@assistant.com" || userId === "ai-assistant";
                     });
                     return otherUser !== undefined;
                 });
                 
                 if (aiConv) {
-                    setAiConversationId(aiConv._id);
-                    const messagesRes = await axios.get(`/api/messages/${aiConv._id}`);
-                    setMessages(messagesRes.data);
+                    setAiConversationId(aiConv?._id);
+                    // Use pagination for AI messages too
+                    const messagesRes = await axios.get(`/api/messages/${aiConv?._id}?limit=50&skip=${skip}&sort=desc`);
+                    if (skip === 0) {
+                        setMessages(messagesRes?.data?.messages || messagesRes?.data || []);
+                    } else {
+                        setMessages((prev) => [...(messagesRes?.data?.messages || messagesRes?.data || []), ...prev]);
+                    }
                 } else {
                     setMessages([]);
                     setAiConversationId(null);
@@ -432,8 +489,49 @@ export default function ChatPage() {
 
         setIsLoadingMessages(true);
         try {
-            const res = await axios.get(`/api/messages/${convId}`);
-            setMessages(res.data);
+            // Check cache first (only for initial load)
+            if (skip === 0) {
+                const cached = messagesCacheRef.current.get(convId);
+                const now = Date.now();
+                if (cached && (now - cached.timestamp < CACHE_TTL)) {
+                    setMessages(cached.messages);
+                    setIsLoadingMessages(false);
+                    setTimeout(() => scrollToBottom(), 0);
+                    // Load fresh data in background
+                    axios.get(`/api/messages/${convId}?limit=50&skip=0&sort=desc`).then((res) => {
+                        const newMessages = res?.data?.messages || res?.data || [];
+                        setMessages(newMessages);
+                        messagesCacheRef.current.set(convId, {
+                            messages: newMessages,
+                            timestamp: now
+                        });
+                    }).catch(() => {});
+                    return;
+                }
+            }
+            
+            // Use pagination - load last 50 messages initially
+            const res = await axios.get(`/api/messages/${convId}?limit=50&skip=${skip}&sort=desc`);
+            const newMessages = res?.data?.messages || res?.data || [];
+            const pagination = res?.data?.pagination;
+            
+            // Update hasMoreMessages state
+            if (pagination) {
+                setHasMoreMessages(pagination?.hasMore || false);
+            }
+            
+            if (skip === 0) {
+                setMessages(newMessages);
+                // Cache the result
+                messagesCacheRef.current.set(convId, {
+                    messages: newMessages,
+                    timestamp: Date.now()
+                });
+            } else {
+                // Prepend older messages when loading more
+                setMessages((prev) => [...newMessages, ...prev]);
+            }
+            
             setTimeout(() => scrollToBottom(), 0);
             setConversations((prev) => prev.map((c) => (c._id === convId ? { ...c, unreadCount: 0 } : c)));
         } finally {
@@ -475,7 +573,7 @@ export default function ChatPage() {
             setMessages((prev) => [...prev, enriched]);
             
             // Mark message as seen immediately since user is viewing this conversation
-            const isFromMe = (data.sender?._id || data.sender) === user.id;
+            const isFromMe = (data?.sender?._id || data?.sender) === user?.id;
             if (!isFromMe) {
                 try {
                     await axios.put(`/api/messages/${convId}`, { userId: user.id });
@@ -527,7 +625,7 @@ export default function ChatPage() {
         if (!newMsg.trim() && !selectedFile) return;
         if (!selectedConv || !user) return;
 
-        // Handle AI chat
+        // Handle AI chat with streaming
         if (selectedConv === "ai-chat") {
             if (!newMsg.trim()) return; // AI chat doesn't support files yet
             
@@ -538,7 +636,7 @@ export default function ChatPage() {
             try {
                 // Add user message optimistically
                 const tempUserMessage = {
-                    _id: `temp-${Date.now()}`,
+                    _id: `temp-user-${Date.now()}`,
                     text: userMessageText,
                     sender: { _id: user.id, name: user.name, email: user.email },
                     conversation: aiConversationId || "ai-chat",
@@ -548,34 +646,102 @@ export default function ChatPage() {
                 setMessages((prev) => [...prev, tempUserMessage]);
                 scrollToBottom();
 
-                // Call AI API
-                const response = await axios.post('/api/ai/chat', {
-                    conversationId: aiConversationId || "ai-chat",
-                    message: userMessageText,
-                    userId: user.id,
+                // Create temp AI message for streaming
+                const tempAiMessageId = `temp-ai-${Date.now()}`;
+                const tempAiMessage = {
+                    _id: tempAiMessageId,
+                    text: "",
+                    sender: { _id: "ai-assistant", name: "AI Assistant", email: "ai@assistant.com" },
+                    conversation: aiConversationId || "ai-chat",
+                    createdAt: new Date(),
+                    seenBy: [user.id],
+                    isStreaming: true,
+                };
+                setMessages((prev) => [...prev, tempAiMessage]);
+
+                // Use streaming API
+                const response = await fetch('/api/ai/chat-stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        conversationId: aiConversationId || "ai-chat",
+                        message: userMessageText,
+                        userId: user.id,
+                    }),
                 });
 
-                // Remove temp message and add real messages
-                setMessages((prev) => {
-                    const filtered = prev.filter(m => m._id !== tempUserMessage._id);
-                    return [...filtered, response.data.userMessage, response.data.aiMessage];
-                });
-
-                // Update conversation ID if it was created
-                if (response.data.conversationId) {
-                    setAiConversationId(response.data.conversationId);
+                if (!response.ok) {
+                    throw new Error('Streaming failed');
                 }
 
-                // Reload conversations to show AI chat in list
-                try {
-                    const convs = await axios.get(`/api/conversations?userId=${user.id}`);
-                    setConversations(convs.data);
-                } catch (_) {}
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let fullResponse = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'user-message') {
+                                    // Replace temp user message with real one
+                                    setMessages((prev) => {
+                                        const filtered = prev.filter(m => m._id !== tempUserMessage._id);
+                                        return [...filtered, data.message];
+                                    });
+                                } else if (data.type === 'chunk') {
+                                    // Update streaming message
+                                    fullResponse += data.content;
+                                    setMessages((prev) =>
+                                        prev.map((m) =>
+                                            m._id === tempAiMessageId
+                                                ? { ...m, text: fullResponse }
+                                                : m
+                                        )
+                                    );
+                                    scrollToBottom();
+                                } else if (data.type === 'complete') {
+                                    // Replace temp AI message with real one
+                                    setMessages((prev) => {
+                                        const filtered = prev.filter(m => m._id !== tempAiMessageId);
+                                        return [...filtered, data.message];
+                                    });
+                                    
+                                    // Update conversation ID if it was created
+                                    if (data.message?.conversation) {
+                                        setAiConversationId(data.message.conversation);
+                                    }
+                                    
+                                    // Reload conversations to show AI chat in list
+                                    try {
+                                        const convs = await axios.get(`/api/conversations?userId=${user.id}`);
+                                        setConversations(convs.data);
+                                    } catch (_) {}
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.error || 'AI error');
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE:', e);
+                            }
+                        }
+                    }
+                }
 
                 setTimeout(() => scrollToBottom(), 100);
             } catch (error) {
                 console.error("AI chat error:", error);
-                // Remove temp message on error
+                // Remove temp messages on error
                 setMessages((prev) => prev.filter(m => !m._id?.startsWith('temp-')));
                 alert("Failed to send message to AI. Please try again.");
             } finally {
@@ -646,6 +812,7 @@ export default function ChatPage() {
 
     const handleSelectConversation = (convId) => {
         setSelectedConv(convId);
+        setHasMoreMessages(false); // Reset pagination state
         selectedConvRef.current = convId;
         if (isMobile) {
             setShowSidebar(false);
@@ -734,11 +901,11 @@ export default function ChatPage() {
         setRecvLang(lang);
         const otherUser = conversations
             .find((c) => c._id === selectedConv)
-            ?.participants.find((p) => p._id !== user.id);
+            ?.participants?.find((p) => p?._id !== user?.id);
         if (!otherUser || !user) return;
         try {
-            await axios.put(`/api/users/prefs?userId=${user.id}`, {
-                targetUserId: otherUser._id,
+            await axios.put(`/api/users/prefs?userId=${user?.id}`, {
+                targetUserId: otherUser?._id,
                 targetLang: lang,
             });
             setLangPrefs((prev) => ({ ...prev, [otherUser._id]: lang }));
@@ -790,6 +957,18 @@ export default function ChatPage() {
             setArchivedConversations(Array.from(archivedMap.values()));
         } catch (error) {
             alert("Failed to unarchive conversation");
+        }
+    };
+
+    const loadMoreMessages = async () => {
+        if (!selectedConv || isLoadingMoreMessages || !hasMoreMessages || selectedConv === "ai-chat") return;
+        
+        setIsLoadingMoreMessages(true);
+        try {
+            const currentSkip = messages.length;
+            await loadMessages(selectedConv, currentSkip);
+        } finally {
+            setIsLoadingMoreMessages(false);
         }
     };
 
@@ -870,7 +1049,7 @@ export default function ChatPage() {
         });
         
         if (aiConv) {
-            otherUser = aiConv.participants.find(p => p.email === "ai@assistant.com");
+            otherUser = aiConv?.participants?.find(p => p?.email === "ai@assistant.com");
         } else {
             // Virtual AI user object if conversation not loaded yet
             otherUser = {
@@ -880,12 +1059,12 @@ export default function ChatPage() {
             };
         }
         isOtherOnline = true; // AI is always "online"
-        otherUserId = otherUser._id || "ai-assistant";
+        otherUserId = otherUser?._id || "ai-assistant";
     } else {
-        selectedConversation = conversations.find((c) => c._id === selectedConv) 
-            || archivedConversations.find((c) => c._id === selectedConv);
-        otherUser = selectedConversation?.participants.find((p) => p._id !== user.id);
-        isOtherOnline = otherUser ? onlineUsers.some((u) => u.id === otherUser._id) : false;
+        selectedConversation = conversations.find((c) => c?._id === selectedConv) 
+            || archivedConversations.find((c) => c?._id === selectedConv);
+        otherUser = selectedConversation?.participants?.find((p) => p?._id !== user?.id);
+        isOtherOnline = otherUser ? onlineUsers.some((u) => u?.id === otherUser?._id) : false;
         otherUserId = otherUser?._id;
     }
 
@@ -936,7 +1115,7 @@ export default function ChatPage() {
                                             onOutgoingCall={setIsOutgoingCall}
                                             messages={messages}
                                             onDeleteConversation={async () => {}}
-                                            isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                            isArchived={archivedConversations.some((c) => c?._id === selectedConv)}
                                             onArchiveConversation={handleArchiveConversation}
                                             onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
                                             onBackMobile={handleBackToList}
@@ -967,6 +1146,9 @@ export default function ChatPage() {
                                     messagesEndRef={messagesEndRef}
                                     typingUsers={typingUsers}
                                     isAIGenerating={isAILoading && selectedConv === "ai-chat"}
+                                    hasMoreMessages={hasMoreMessages}
+                                    isLoadingMoreMessages={isLoadingMoreMessages}
+                                    onLoadMore={loadMoreMessages}
                                 />
                                     )}
 
@@ -1034,7 +1216,7 @@ export default function ChatPage() {
                                         onOutgoingCall={setIsOutgoingCall}
                                         messages={messages}
                                         onDeleteConversation={async () => {}}
-                                        isArchived={archivedConversations.some((c) => c._id === selectedConv)}
+                                        isArchived={archivedConversations.some((c) => c?._id === selectedConv)}
                                         onArchiveConversation={handleArchiveConversation}
                                         onUnarchiveConversation={() => handleUnarchiveConversation(selectedConv)}
                                     />
@@ -1063,6 +1245,9 @@ export default function ChatPage() {
                                         messagesEndRef={messagesEndRef}
                                         typingUsers={typingUsers}
                                         isAIGenerating={isAILoading && selectedConv === "ai-chat"}
+                                        hasMoreMessages={hasMoreMessages}
+                                        isLoadingMoreMessages={isLoadingMoreMessages}
+                                        onLoadMore={loadMoreMessages}
                                     />
                                 )}
 

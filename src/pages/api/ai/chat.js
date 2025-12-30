@@ -75,8 +75,8 @@ export default async function handler(req, res) {
 
     // Reverse to get chronological order
     const messageHistory = recentMessages.reverse().map((msg) => ({
-      role: msg.sender._id === userId || msg.sender === userId ? "user" : "assistant",
-      content: msg.text || "",
+      role: msg?.sender?._id === userId || msg?.sender === userId ? "user" : "assistant",
+      content: msg?.text || "",
     }));
 
     // Add current user message
