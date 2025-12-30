@@ -8,7 +8,6 @@ export default function ChatHeader({
   recvLang,
   onRecvLangChange,
   isTranslating,
-  typingUsers,
   isOtherOnline,
   conversationId,
   otherUser,

@@ -29,7 +29,6 @@ export default function ChatPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [langPrefs, setLangPrefs] = useState({});
     const [selectedMessages, setSelectedMessages] = useState(new Set());
     const [selectedMessageForTranslation, setSelectedMessageForTranslation] = useState(null);
     const [selectedMessageForDeletion, setSelectedMessageForDeletion] = useState(null);
@@ -57,7 +56,6 @@ export default function ChatPage() {
     
     // Client-side cache for messages and conversations
     const messagesCacheRef = useRef(new Map()); // conversationId -> { messages, timestamp }
-    const conversationsCacheRef = useRef(null);
     const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
     // Custom hooks
@@ -167,15 +165,6 @@ export default function ChatPage() {
     }, [router]);
 
     // Load language preferences
-    useEffect(() => {
-        if (!user) return;
-        (async () => {
-            try {
-                const res = await axios.get(`/api/users/prefs?userId=${user.id}`);
-                setLangPrefs(res.data || {});
-            } catch (_) {}
-        })();
-    }, [user]);
 
     // Search users (debounced)
     useEffect(() => {
@@ -908,7 +897,6 @@ export default function ChatPage() {
                 targetUserId: otherUser?._id,
                 targetLang: lang,
             });
-            setLangPrefs((prev) => ({ ...prev, [otherUser._id]: lang }));
         } catch (_) {}
     };
 
@@ -1131,25 +1119,22 @@ export default function ChatPage() {
                                             </div>
                                         </div>
                                     ) : (
-                                <MessageList
-                                    messages={messages}
-                                    user={user}
-                                    selectedMessages={selectedMessages}
-                                    onToggleMessageSelection={toggleMessageSelection}
-                                    onTranslateMessage={setSelectedMessageForTranslation}
-                                    onDeleteMessage={setSelectedMessageForDeletion}
-                                    formatFileSize={formatFileSize}
-                                    otherUserId={otherUserId}
-                                    isTranslatingMessage={isTranslatingMessage}
-                                    isDeletingMessage={isDeletingMessage}
-                                    messagesContainerRef={messagesContainerRef}
-                                    messagesEndRef={messagesEndRef}
-                                    typingUsers={typingUsers}
-                                    isAIGenerating={isAILoading && selectedConv === "ai-chat"}
-                                    hasMoreMessages={hasMoreMessages}
-                                    isLoadingMoreMessages={isLoadingMoreMessages}
-                                    onLoadMore={loadMoreMessages}
-                                />
+                                    <MessageList
+                                        messages={messages}
+                                        user={user}
+                                        selectedMessages={selectedMessages}
+                                        onToggleMessageSelection={toggleMessageSelection}
+                                        onTranslateMessage={setSelectedMessageForTranslation}
+                                        onDeleteMessage={setSelectedMessageForDeletion}
+                                        formatFileSize={formatFileSize}
+                                        otherUserId={otherUserId}
+                                        isTranslatingMessage={isTranslatingMessage}
+                                        isDeletingMessage={isDeletingMessage}
+                                        messagesContainerRef={messagesContainerRef}
+                                        messagesEndRef={messagesEndRef}
+                                        typingUsers={typingUsers}
+                                        isAIGenerating={isAILoading && selectedConv === "ai-chat"}
+                                    />
                                     )}
 
                                     <div className="sticky bottom-0 z-10">
@@ -1207,7 +1192,6 @@ export default function ChatPage() {
                                         recvLang={recvLang}
                                         onRecvLangChange={saveRecvLang}
                                         isTranslating={isTranslating}
-                                        typingUsers={typingUsers}
                                         isOtherOnline={isOtherOnline}
                                         conversationId={selectedConv}
                                         otherUser={otherUser}
@@ -1245,9 +1229,6 @@ export default function ChatPage() {
                                         messagesEndRef={messagesEndRef}
                                         typingUsers={typingUsers}
                                         isAIGenerating={isAILoading && selectedConv === "ai-chat"}
-                                        hasMoreMessages={hasMoreMessages}
-                                        isLoadingMoreMessages={isLoadingMoreMessages}
-                                        onLoadMore={loadMoreMessages}
                                     />
                                 )}
 

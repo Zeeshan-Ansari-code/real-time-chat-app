@@ -1,5 +1,5 @@
 "use client";
-import { File, Image as ImageIcon, Video, Music, FileText, AlertCircle } from "lucide-react";
+import { File, Image as ImageIcon, Video, Music } from "lucide-react";
 import { useState } from "react";
 
 export default function MessageItem({
