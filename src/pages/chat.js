@@ -461,7 +461,8 @@ export default function ChatPage() {
                     setMessages([]);
                     setAiConversationId(null);
                 }
-                setTimeout(() => scrollToBottom(), 0);
+                // Use requestAnimationFrame for smoother scrolling
+                requestAnimationFrame(() => scrollToBottom());
             } catch (error) {
                 console.error("Error loading AI messages:", error);
                 setMessages([]);
@@ -480,7 +481,8 @@ export default function ChatPage() {
                 if (cached && (now - cached.timestamp < CACHE_TTL)) {
                     setMessages(cached.messages);
                     setIsLoadingMessages(false);
-                    setTimeout(() => scrollToBottom(), 0);
+                    // Use requestAnimationFrame for smoother scrolling
+                requestAnimationFrame(() => scrollToBottom());
                     // Load fresh data in background
                     axios.get(`/api/messages/${convId}?limit=50&skip=0&sort=desc`).then((res) => {
                         const newMessages = res?.data?.messages || res?.data || [];
@@ -1066,8 +1068,6 @@ export default function ChatPage() {
             pusherRef.current?.disconnect?.();
         } catch (_) {}
         localStorage.removeItem("user");
-        // Small delay to show loading state
-        await new Promise(resolve => setTimeout(resolve, 500));
         router.push("/");
     };
 
@@ -1082,8 +1082,7 @@ export default function ChatPage() {
     // After messages finish loading or on conversation change, jump to bottom once
     useEffect(() => {
         if (isLoadingMessages) return;
-        const id = setTimeout(() => scrollToBottom(), 0);
-        return () => clearTimeout(id);
+        requestAnimationFrame(() => scrollToBottom());
     }, [isLoadingMessages, selectedConv, messages.length]);
 
     // Update selectedConvRef when selectedConv changes

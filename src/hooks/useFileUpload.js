@@ -21,6 +21,10 @@ export function useFileUpload() {
       formData.append('file', file);
 
       // Use axios with onUploadProgress for progress tracking
+      // Optimize timeout based on file size (smaller files = shorter timeout)
+      const fileSizeMB = file.size / (1024 * 1024);
+      const timeout = fileSizeMB < 1 ? 30000 : fileSizeMB < 5 ? 60000 : 90000; // 30s, 60s, or 90s
+      
       const response = await axios.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
@@ -30,7 +34,9 @@ export function useFileUpload() {
             // For now, we just track it internally
           }
         },
-        timeout: 120000, // 2 minutes timeout for large files
+        timeout: timeout,
+        // Add signal for cancellation support
+        signal: AbortSignal.timeout(timeout),
       });
 
       setSelectedFile(response.data);

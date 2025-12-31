@@ -7,7 +7,10 @@ import { v2 as cloudinary } from 'cloudinary';
 export const config = {
   api: {
     bodyParser: false,
+    responseLimit: false, // Disable response size limit
+    externalResolver: true, // Let Next.js handle the response
   },
+  maxDuration: 60, // 60 seconds max for Vercel serverless functions
 };
 
 // Configure Cloudinary
@@ -72,11 +75,21 @@ export default async function handler(req, res) {
       }
     });
 
+    // Set response timeout
+    let timeoutId = setTimeout(() => {
+      if (!res.headersSent) {
+        res.status(504).json({ error: 'Upload timeout - request took too long' });
+      }
+    }, 55000); // 55 seconds (slightly less than maxDuration)
+
     return new Promise((resolve, reject) => {
       form.parse(req, async (err, fields, files) => {
         if (err) {
+          clearTimeout(timeoutId);
           console.error('Formidable parse error:', err);
-          reject(res.status(500).json({ error: 'File upload failed', details: err.message }));
+          if (!res.headersSent) {
+            reject(res.status(500).json({ error: 'File upload failed', details: err.message }));
+          }
           return;
         }
 
@@ -96,6 +109,7 @@ export default async function handler(req, res) {
         }
         
         if (!file) {
+          clearTimeout(timeoutId);
           console.error('No file found in:', files);
           reject(res.status(400).json({ error: 'No file provided', received: Object.keys(files) }));
           return;
@@ -104,6 +118,7 @@ export default async function handler(req, res) {
         // In formidable v2, the file structure is more straightforward
         const filePath = file.filepath || file.path;
         if (!filePath) {
+          clearTimeout(timeoutId);
           reject(res.status(500).json({ error: 'Invalid file object - no file path' }));
           return;
         }
@@ -156,13 +171,29 @@ export default async function handler(req, res) {
               resourceType = 'raw';
             }
             
-            const uploadResult = await cloudinary.uploader.upload(filePath, {
-              resource_type: resourceType,
-              folder: 'chat-uploads',
-              use_filename: false,
-              unique_filename: true,
-              overwrite: false,
-            });
+            // Optimize Cloudinary upload with timeout and better options
+            const uploadResult = await Promise.race([
+              cloudinary.uploader.upload(filePath, {
+                resource_type: resourceType,
+                folder: 'chat-uploads',
+                use_filename: false,
+                unique_filename: true,
+                overwrite: false,
+                // Optimization options
+                ...(resourceType === 'image' && {
+                  quality: 'auto',
+                  fetch_format: 'auto',
+                }),
+                ...(resourceType === 'video' && {
+                  quality: 'auto',
+                }),
+                // Timeout for upload
+                timeout: 50000, // 50 seconds
+              }),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Cloudinary upload timeout')), 50000)
+              )
+            ]);
 
             // Delete local file after successful upload
             try {
@@ -172,6 +203,7 @@ export default async function handler(req, res) {
             }
 
             // Return file info with Cloudinary URL
+            clearTimeout(timeoutId);
             resolve(res.status(200).json({
               fileType,
               fileName: file.originalFilename || 'Unknown file',
@@ -180,6 +212,7 @@ export default async function handler(req, res) {
               mimetype: mimetype
             }));
           } catch (cloudinaryError) {
+            clearTimeout(timeoutId);
             console.error('Cloudinary upload error:', cloudinaryError);
             // Fallback to local storage if Cloudinary fails
             const ext = path.extname(file.originalFilename || '');
@@ -187,13 +220,15 @@ export default async function handler(req, res) {
             const newPath = path.join(uploadsDir, filename);
             fs.renameSync(filePath, newPath);
             
-            resolve(res.status(200).json({
-              fileType,
-              fileName: file.originalFilename || 'Unknown file',
-              fileUrl: `/uploads/${filename}`,
-              fileSize: file.size || 0,
-              mimetype: mimetype
-            }));
+            if (!res.headersSent) {
+              resolve(res.status(200).json({
+                fileType,
+                fileName: file.originalFilename || 'Unknown file',
+                fileUrl: `/uploads/${filename}`,
+                fileSize: file.size || 0,
+                mimetype: mimetype
+              }));
+            }
           }
         } else {
           // Use local storage (fallback or development)
@@ -206,15 +241,21 @@ export default async function handler(req, res) {
             fs.renameSync(filePath, newPath);
 
             // Return file info
-            resolve(res.status(200).json({
-              fileType,
-              fileName: file.originalFilename || 'Unknown file',
-              fileUrl: `/uploads/${filename}`,
-              fileSize: file.size || 0,
-              mimetype: mimetype
-            }));
+            clearTimeout(timeoutId);
+            if (!res.headersSent) {
+              resolve(res.status(200).json({
+                fileType,
+                fileName: file.originalFilename || 'Unknown file',
+                fileUrl: `/uploads/${filename}`,
+                fileSize: file.size || 0,
+                mimetype: mimetype
+              }));
+            }
           } catch (moveError) {
-            reject(res.status(500).json({ error: 'Failed to save file' }));
+            clearTimeout(timeoutId);
+            if (!res.headersSent) {
+              reject(res.status(500).json({ error: 'Failed to save file' }));
+            }
           }
         }
       });

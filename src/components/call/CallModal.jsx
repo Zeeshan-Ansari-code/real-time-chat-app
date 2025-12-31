@@ -87,11 +87,16 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     }
   }, [isIncoming, incomingOffer, otherUser, callType]);
 
-  // Enumerate cameras on mount
+  // Enumerate cameras on mount (only for video calls)
   useEffect(() => {
+    // Skip camera enumeration for voice calls
+    if (isVoiceCall) {
+      return;
+    }
+    
     const enumerateCameras = async () => {
       try {
-        // Request permission first to get device labels
+        // Request permission first to get device labels (only for video calls)
         await navigator.mediaDevices.getUserMedia({ video: true });
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -104,7 +109,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
       }
     };
     enumerateCameras();
-  }, []);
+  }, [isVoiceCall]);
 
   // Start local stream when modal opens in idle state
   useEffect(() => {
