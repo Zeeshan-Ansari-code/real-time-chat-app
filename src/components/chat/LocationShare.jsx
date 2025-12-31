@@ -22,55 +22,80 @@ export default function LocationShare({ onLocationSelected, onCancel }) {
       async (position) => {
         const { latitude, longitude } = position.coords;
         
-        // Try to get address using reverse geocoding (free OpenStreetMap Nominatim API)
-        // Note: Nominatim requires proper User-Agent and has rate limits (1 req/sec)
-        // Respect rate limit by adding delay if needed
-        const now = Date.now();
-        const timeSinceLastRequest = now - lastGeocodeTimeRef.current;
-        if (timeSinceLastRequest < 1000) {
-          // Wait if less than 1 second since last request
-          await new Promise(resolve => setTimeout(resolve, 1000 - timeSinceLastRequest));
-        }
+        // Try to get address using reverse geocoding with multiple free services
+        // Try Photon first (open-source, free, works client-side), then fallback to others
+        let address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
         
+        // Try Photon Geocoder (free, open-source, no API key needed)
         try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          const photonResponse = await fetch(
+            `https://photon.komoot.io/reverse?lat=${latitude}&lon=${longitude}&lang=en`,
             {
+              method: 'GET',
               headers: {
-                'User-Agent': 'RealTimeChatApp/1.0 (Contact: your-email@example.com)',
                 'Accept': 'application/json',
-                'Referer': typeof window !== 'undefined' ? window.location.origin : ''
               }
             }
           );
           
-          lastGeocodeTimeRef.current = Date.now();
-          
-          if (!response.ok) {
-            // If 403 or rate limited, skip geocoding and use coordinates
-            if (response.status === 403 || response.status === 429) {
-              throw new Error('Rate limited - using coordinates only');
+          if (photonResponse.ok) {
+            const photonData = await photonResponse.json();
+            if (photonData?.features && photonData.features.length > 0) {
+              const feature = photonData.features[0];
+              const props = feature?.properties;
+              if (props) {
+                // Build address from Photon properties
+                const addressParts = [];
+                if (props.name) addressParts.push(props.name);
+                if (props.street) addressParts.push(props.street);
+                if (props.city) addressParts.push(props.city);
+                if (props.state) addressParts.push(props.state);
+                if (props.country) addressParts.push(props.country);
+                
+                address = addressParts.length > 0 
+                  ? addressParts.join(', ') 
+                  : props.name || address;
+              }
             }
-            throw new Error(`Nominatim API error: ${response.status}`);
           }
+        } catch (photonError) {
+          console.warn('Photon geocoding failed, trying alternatives:', photonError);
           
-          const data = await response.json();
-          const address = data?.display_name || data?.address?.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
-          
-          setLocation({
-            latitude,
-            longitude,
-            address
-          });
-        } catch (err) {
-          console.warn('Reverse geocoding failed, using coordinates:', err);
-          // If reverse geocoding fails, just use coordinates
-          setLocation({
-            latitude,
-            longitude,
-            address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          });
+          // Fallback: Try BigDataCloud (free, no API key for basic use)
+          try {
+            const bigDataResponse = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+              {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json',
+                }
+              }
+            );
+            
+            if (bigDataResponse.ok) {
+              const bigDataData = await bigDataResponse.json();
+              if (bigDataData?.locality || bigDataData?.city) {
+                const addressParts = [];
+                if (bigDataData.locality) addressParts.push(bigDataData.locality);
+                if (bigDataData.city && bigDataData.city !== bigDataData.locality) addressParts.push(bigDataData.city);
+                if (bigDataData.principalSubdivision) addressParts.push(bigDataData.principalSubdivision);
+                if (bigDataData.countryName) addressParts.push(bigDataData.countryName);
+                
+                address = addressParts.length > 0 ? addressParts.join(', ') : address;
+              }
+            }
+          } catch (bigDataError) {
+            console.warn('BigDataCloud geocoding also failed, using coordinates:', bigDataError);
+            // Final fallback: use coordinates (already set above)
+          }
         }
+        
+        setLocation({
+          latitude,
+          longitude,
+          address
+        });
         setIsLoading(false);
       },
       (error) => {
@@ -180,25 +205,26 @@ export default function LocationShare({ onLocationSelected, onCancel }) {
             
             {getMapUrl() && (
               <div className="mb-4">
-                <a
-                  href={getMapUrl()}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 rounded-lg overflow-hidden relative group border-2 border-blue-500 hover:border-blue-600 transition-all hover:shadow-lg"
-                >
-                  <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                    <MapPin className="w-16 h-16 text-blue-500 mb-2" />
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-200 text-center mb-1">
-                      Location Preview
-                    </p>
-                    <p className="text-xs text-gray-600 dark:text-gray-300 text-center">
-                      {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                    </p>
-                    <span className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      Click to view on map →
-                    </span>
-                  </div>
-                </a>
+                <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden relative group border-2 border-blue-500 hover:border-blue-600 transition-all hover:shadow-lg">
+                  {/* Interactive OpenStreetMap embed - free, no API key needed */}
+                  <iframe
+                    src={`https://www.openstreetmap.org/export/embed.html?bbox=${location.longitude - 0.01},${location.latitude - 0.01},${location.longitude + 0.01},${location.latitude + 0.01}&layer=mapnik&marker=${location.latitude},${location.longitude}`}
+                    className="w-full h-full border-0 pointer-events-auto"
+                    title="Location map"
+                    loading="lazy"
+                    allowFullScreen
+                  />
+                  {/* Separate button to open full map - positioned at bottom right, doesn't block map controls */}
+                  <a
+                    href={getMapUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded shadow-lg transition-colors z-10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    View Full Map
+                  </a>
+                </div>
               </div>
             )}
 
