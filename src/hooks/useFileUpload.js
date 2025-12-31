@@ -17,35 +17,50 @@ export function useFileUpload() {
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      // Determine file type
+      let fileType = 'auto';
+      if (file.type.startsWith('image/')) {
+        fileType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        fileType = 'video';
+      } else if (file.type.startsWith('audio/')) {
+        fileType = 'voice';
+      } else if (file.type.startsWith('application/') || file.type.startsWith('text/')) {
+        fileType = 'document';
+      }
 
-      // Use axios with onUploadProgress for progress tracking
-      // Optimize timeout based on file size (Vercel Hobby plan has 10s limit)
-      const fileSizeMB = file.size / (1024 * 1024);
-      // Reduced timeouts for Vercel Hobby plan compatibility
-      const timeout = fileSizeMB < 1 ? 8000 : fileSizeMB < 5 ? 9000 : 9500; // 8s, 9s, or 9.5s
-      
-      const response = await axios.post('/api/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            // You can emit this progress to parent component if needed
-            // For now, we just track it internally
-          }
-        },
-        timeout: timeout,
-        // Add signal for cancellation support
-        signal: AbortSignal.timeout(timeout),
-      });
+      let result;
 
-      setSelectedFile(response.data);
+      // Try client-side Cloudinary upload first (bypasses Vercel timeout)
+      try {
+        const { uploadToCloudinary } = await import("@/utils/cloudinaryUpload");
+        result = await uploadToCloudinary(file, fileType, (progress) => {
+          // Progress tracking if needed
+        });
+        setSelectedFile({
+          fileType,
+          fileName: file.name,
+          fileUrl: result.fileUrl,
+          fileSize: result.bytes || file.size,
+          mimetype: file.type,
+        });
+      } catch (cloudinaryError) {
+        console.warn('Client-side Cloudinary upload failed, trying server-side:', cloudinaryError);
+        // Fallback to server-side upload
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await axios.post('/api/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 9000,
+        });
+        setSelectedFile(response.data);
+      }
     } catch (error) {
+      console.error('Upload error:', error);
       if (error.code === 'ECONNABORTED') {
-        alert("Upload timeout. Please try again with a smaller file.");
+        alert("Upload timeout. Please try again with a smaller file or configure Cloudinary client-side uploads.");
       } else {
-        alert("Failed to upload file");
+        alert(error.message || "Failed to upload file. Please check Cloudinary configuration.");
       }
     } finally {
       setIsUploading(false);

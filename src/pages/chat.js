@@ -790,30 +790,37 @@ export default function ChatPage() {
         if (!selectedConv || !user || selectedConv === "ai-chat") return;
 
         try {
-            // Create FormData for file upload
-            const formData = new FormData();
             const fileName = `voice-${Date.now()}.webm`;
-            formData.append("file", audioBlob, fileName);
-            formData.append("conversationId", selectedConv);
-            formData.append("senderId", user.id);
-            formData.append("fileType", "voice");
+            const voiceFile = new File([audioBlob], fileName, { type: 'audio/webm' });
 
-            // Upload voice message
-            // Don't set Content-Type header - let axios set it automatically with boundary
-            const uploadResponse = await axios.post("/api/upload", formData, {
-                onUploadProgress: (progressEvent) => {
-                    // Optional: show upload progress
-                },
-            });
+            let fileUrl;
+            let fileSize = audioBlob.size;
 
-            if (uploadResponse.data?.fileUrl) {
+            // Try client-side Cloudinary upload first (bypasses Vercel timeout)
+            try {
+                const { uploadToCloudinary } = await import("@/utils/cloudinaryUpload");
+                const uploadResult = await uploadToCloudinary(voiceFile, 'voice');
+                fileUrl = uploadResult?.fileUrl;
+                fileSize = uploadResult?.bytes || audioBlob.size;
+            } catch (cloudinaryError) {
+                console.warn('Client-side Cloudinary upload failed, trying server-side:', cloudinaryError);
+                // Fallback to server-side upload
+                const formData = new FormData();
+                formData.append("file", audioBlob, fileName);
+                formData.append("fileType", "voice");
+                const uploadResponse = await axios.post("/api/upload", formData, { timeout: 9000 });
+                fileUrl = uploadResponse.data?.fileUrl;
+                fileSize = uploadResponse.data?.fileSize || audioBlob.size;
+            }
+
+            if (fileUrl) {
                 // Send message with voice file
                 await axios.post(`/api/messages/${selectedConv}`, {
                     senderId: user.id,
                     fileType: "voice",
-                    fileUrl: uploadResponse.data.fileUrl,
+                    fileUrl: fileUrl,
                     fileName: fileName,
-                    fileSize: audioBlob.size,
+                    fileSize: fileSize,
                     text: "🎤 Voice message",
                 });
             }
