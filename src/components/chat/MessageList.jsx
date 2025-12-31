@@ -16,7 +16,10 @@ export default function MessageList({
   messagesContainerRef,
   messagesEndRef,
   typingUsers = [],
-  isAIGenerating = false
+  isAIGenerating = false,
+  currentUserId,
+  onAddReaction,
+  onRemoveReaction
 }) {
   // Store callback in ref to avoid dependency issues
   const onToggleRef = useRef(onToggleMessageSelection);
@@ -106,6 +109,9 @@ export default function MessageList({
               otherUserId={otherUserId}
               isTranslatingMessage={isTranslatingMessage}
               isDeletingMessage={isDeletingMessage}
+              currentUserId={currentUserId}
+              onAddReaction={onAddReaction}
+              onRemoveReaction={onRemoveReaction}
             />
           </div>
         );

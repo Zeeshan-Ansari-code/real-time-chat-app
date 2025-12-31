@@ -42,8 +42,6 @@ export default function ChatPage() {
     const [showSidebar, setShowSidebar] = useState(true);
     const [isAILoading, setIsAILoading] = useState(false);
     const [aiConversationId, setAiConversationId] = useState(null);
-    const [hasMoreMessages, setHasMoreMessages] = useState(false);
-    const [isLoadingMoreMessages, setIsLoadingMoreMessages] = useState(false);
 
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
@@ -62,7 +60,6 @@ export default function ChatPage() {
     const {
         recvLang,
         setRecvLang,
-        isTranslating,
         recvLangRef,
         translateCacheRef
     } = useTranslation(selectedConv, messages, setMessages);
@@ -164,8 +161,6 @@ export default function ChatPage() {
         }
     }, [router]);
 
-    // Load language preferences
-
     // Search users (debounced)
     useEffect(() => {
         if (!user) return;
@@ -177,8 +172,8 @@ export default function ChatPage() {
         setIsSearching(true);
         const id = setTimeout(async () => {
             try {
-                const res = await axios.get(`/api/users/search?q=${encodeURIComponent(q)}&userId=${user.id}`);
-                setSearchResults(res.data || []);
+                const res = await axios.get(`/api/users/search?q=${encodeURIComponent(q)}&userId=${user?.id}`);
+                setSearchResults(res?.data || []);
             } catch (_) {
                 setSearchResults([]);
             } finally {
@@ -237,9 +232,9 @@ export default function ChatPage() {
             presenceChannel.bind("pusher:subscription_succeeded", (members) => {
                 const online = [];
                 members.each((member) => {
-                    let userId = member.id || member.user_id || member.userId;
-                    let userName = member.info?.name || member.name || 'Unknown';
-                    if (userId !== user.id) {
+                    let userId = member?.id || member?.user_id || member?.userId;
+                    let userName = member?.info?.name || member?.name || 'Unknown';
+                    if (userId && user?.id && userId !== user.id) {
                         online.push({ id: userId, name: userName });
                     }
                 });
@@ -249,16 +244,16 @@ export default function ChatPage() {
             presenceChannel.bind("pusher:subscription_error", (error) => {});
 
             presenceChannel.bind("pusher:member_added", (member) => {
-                let userId = member.id || member.user_id || member.userId;
-                let userName = member.info?.name || member.name || 'Unknown';
-                if (userId !== user.id) {
+                let userId = member?.id || member?.user_id || member?.userId;
+                let userName = member?.info?.name || member?.name || 'Unknown';
+                if (userId && user?.id && userId !== user.id) {
                     setOnlineUsers((prev) => [...prev, { id: userId, name: userName }]);
                 }
             });
 
             presenceChannel.bind("pusher:member_removed", (member) => {
                 setOnlineUsers((prev) => {
-                    const filtered = prev.filter((u) => u.id !== member.id);
+                    const filtered = prev.filter((u) => u?.id !== member?.id);
                     return filtered;
                 });
             });
@@ -396,13 +391,13 @@ export default function ChatPage() {
         if (!pusherRef.current) return;
 
         const pusher = pusherRef.current;
-        const channel = pusher.subscribe(`user-${user.id}`);
+        const channel = pusher.subscribe(`user-${user?.id}`);
 
         const handleUpsert = async ({ conversationId }) => {
             try {
-                const res = await axios.get(`/api/conversations?userId=${user.id}`);
-                const newList = Array.isArray(res.data) ? res.data : [];
-                const newMap = new Map(newList.map((c) => [c._id, c]));
+                const res = await axios.get(`/api/conversations?userId=${user?.id}`);
+                const newList = Array.isArray(res?.data) ? res.data : [];
+                const newMap = new Map(newList.map((c) => [c?._id, c]).filter(([id]) => id));
                 setConversations(Array.from(newMap.values()));
             } catch (_) {}
         };
@@ -410,8 +405,8 @@ export default function ChatPage() {
         channel.bind("conversation-upsert", handleUpsert);
 
         return () => {
-            try { channel.unbind("conversation-upsert", handleUpsert); } catch (_) {}
-            try { pusher.unsubscribe(`user-${user.id}`); } catch (_) {}
+            try { channel?.unbind("conversation-upsert", handleUpsert); } catch (_) {}
+            try { pusher?.unsubscribe(`user-${user?.id}`); } catch (_) {}
         };
     }, [user]);
 
@@ -442,8 +437,8 @@ export default function ChatPage() {
             setIsLoadingMessages(true);
             try {
                 // Try to find existing AI conversation
-                const res = await axios.get(`/api/conversations?userId=${user.id}`);
-                const allConvs = res.data || [];
+                const res = await axios.get(`/api/conversations?userId=${user?.id}`);
+                const allConvs = res?.data || [];
                 const aiConv = allConvs.find(c => {
                     const otherUser = c?.participants?.find(p => {
                         const userId = p?._id || p;
@@ -504,10 +499,6 @@ export default function ChatPage() {
             const newMessages = res?.data?.messages || res?.data || [];
             const pagination = res?.data?.pagination;
             
-            // Update hasMoreMessages state
-            if (pagination) {
-                setHasMoreMessages(pagination?.hasMore || false);
-            }
             
             if (skip === 0) {
                 setMessages(newMessages);
@@ -588,6 +579,32 @@ export default function ChatPage() {
 
         channel.bind("message-deleted", ({ messageId }) => {
             setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
+        });
+
+        channel.bind("message-reaction-added", ({ messageId, reaction }) => {
+            setMessages((prev) =>
+                prev.map((msg) => {
+                    if (msg._id === messageId) {
+                        const updatedReactions = [...(msg.reactions || []), reaction];
+                        return { ...msg, reactions: updatedReactions };
+                    }
+                    return msg;
+                })
+            );
+        });
+
+        channel.bind("message-reaction-removed", ({ messageId, emoji, userId }) => {
+            setMessages((prev) =>
+                prev.map((msg) => {
+                    if (msg._id === messageId) {
+                        const updatedReactions = (msg.reactions || []).filter(
+                            (r) => !(r.emoji === emoji && (r.userId?._id || r.userId) === userId)
+                        );
+                        return { ...msg, reactions: updatedReactions };
+                    }
+                    return msg;
+                })
+            );
         });
 
         channel.bind("typing", ({ userId, name }) => {
@@ -714,8 +731,8 @@ export default function ChatPage() {
                                     
                                     // Reload conversations to show AI chat in list
                                     try {
-                                        const convs = await axios.get(`/api/conversations?userId=${user.id}`);
-                                        setConversations(convs.data);
+                                        const convs = await axios.get(`/api/conversations?userId=${user?.id}`);
+                                        setConversations(convs?.data || []);
                                     } catch (_) {}
                                 } else if (data.type === 'error') {
                                     throw new Error(data.error || 'AI error');
@@ -760,7 +777,98 @@ export default function ChatPage() {
             await axios.post(`/api/messages/${selectedConv}`, messageData);
             setNewMsg("");
             setSelectedFile(null);
-        } catch (error) {}
+        } catch (error) {
+            console.error("Error sending message:", error);
+            alert("Failed to send message. Please try again.");
+        }
+    };
+
+    // Handle voice message
+    const handleVoiceMessage = async (audioBlob) => {
+        if (!selectedConv || !user || selectedConv === "ai-chat") return;
+
+        try {
+            // Create FormData for file upload
+            const formData = new FormData();
+            const fileName = `voice-${Date.now()}.webm`;
+            formData.append("file", audioBlob, fileName);
+            formData.append("conversationId", selectedConv);
+            formData.append("senderId", user.id);
+            formData.append("fileType", "voice");
+
+            // Upload voice message
+            // Don't set Content-Type header - let axios set it automatically with boundary
+            const uploadResponse = await axios.post("/api/upload", formData, {
+                onUploadProgress: (progressEvent) => {
+                    // Optional: show upload progress
+                },
+            });
+
+            if (uploadResponse.data?.fileUrl) {
+                // Send message with voice file
+                await axios.post(`/api/messages/${selectedConv}`, {
+                    senderId: user.id,
+                    fileType: "voice",
+                    fileUrl: uploadResponse.data.fileUrl,
+                    fileName: fileName,
+                    fileSize: audioBlob.size,
+                    text: "🎤 Voice message",
+                });
+            }
+        } catch (error) {
+            console.error("Error sending voice message:", error);
+            alert("Failed to send voice message. Please try again.");
+        }
+    };
+
+    // Handle location share
+    const handleLocationShare = async (location) => {
+        if (!selectedConv || !user || selectedConv === "ai-chat") return;
+
+        try {
+            await axios.post(`/api/messages/${selectedConv}`, {
+                senderId: user.id,
+                location: {
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                    address: location.address,
+                },
+                text: "📍 Shared location",
+            });
+        } catch (error) {
+            console.error("Error sharing location:", error);
+            alert("Failed to share location. Please try again.");
+        }
+    };
+
+    // Handle add reaction
+    const handleAddReaction = async (messageId, emoji) => {
+        if (!selectedConv || !user) return;
+
+        try {
+            await axios.post(`/api/messages/${selectedConv}/${messageId}/reactions`, {
+                userId: user.id,
+                emoji: emoji,
+            });
+        } catch (error) {
+            console.error("Error adding reaction:", error);
+        }
+    };
+
+    // Handle remove reaction
+    const handleRemoveReaction = async (messageId, emoji) => {
+        if (!selectedConv || !user) return;
+
+        try {
+            await axios.delete(`/api/messages/${selectedConv}/${messageId}/reactions`, {
+                data: {
+                    userId: user.id,
+                    emoji: emoji,
+                },
+            });
+        } catch (error) {
+            console.error("Error removing reaction:", error);
+        }
     };
 
     const startConversation = async (otherUserId) => {
@@ -801,7 +909,6 @@ export default function ChatPage() {
 
     const handleSelectConversation = (convId) => {
         setSelectedConv(convId);
-        setHasMoreMessages(false); // Reset pagination state
         selectedConvRef.current = convId;
         if (isMobile) {
             setShowSidebar(false);
@@ -907,16 +1014,16 @@ export default function ChatPage() {
             
             if (archiveResponse.data?.archived) {
                 // Reload conversations (non-archived)
-                const res = await axios.get(`/api/conversations?userId=${user.id}`);
-                const list = Array.isArray(res.data) ? res.data : [];
-                const map = new Map(list.map((c) => [c._id, c]));
+                const res = await axios.get(`/api/conversations?userId=${user?.id}`);
+                const list = Array.isArray(res?.data) ? res.data : [];
+                const map = new Map(list.map((c) => [c?._id, c]).filter(([id]) => id));
                 setConversations(Array.from(map.values()));
                 
                 // Reload archived conversations
-                const archivedRes = await axios.get(`/api/conversations?userId=${user.id}&includeArchived=true`);
-                const archivedList = Array.isArray(archivedRes.data) ? archivedRes.data : [];
+                const archivedRes = await axios.get(`/api/conversations?userId=${user?.id}&includeArchived=true`);
+                const archivedList = Array.isArray(archivedRes?.data) ? archivedRes.data : [];
                 // The API already filters to only archived conversations, so we can use them directly
-                const archivedMap = new Map(archivedList.map((c) => [c._id, c]));
+                const archivedMap = new Map(archivedList.map((c) => [c?._id, c]).filter(([id]) => id));
                 setArchivedConversations(Array.from(archivedMap.values()));
                 
                 // Clear selected conversation
@@ -931,34 +1038,23 @@ export default function ChatPage() {
     const handleUnarchiveConversation = async (convId) => {
         if (!convId || !user) return;
         try {
-            await axios.delete(`/api/conversations/${convId}/archive`, { data: { userId: user.id } });
+            await axios.delete(`/api/conversations/${convId}/archive`, { data: { userId: user?.id } });
             // Reload conversations
-            const res = await axios.get(`/api/conversations?userId=${user.id}`);
-            const list = Array.isArray(res.data) ? res.data : [];
-            const map = new Map(list.map((c) => [c._id, c]));
+            const res = await axios.get(`/api/conversations?userId=${user?.id}`);
+            const list = Array.isArray(res?.data) ? res.data : [];
+            const map = new Map(list.map((c) => [c?._id, c]).filter(([id]) => id));
             setConversations(Array.from(map.values()));
             
             // Reload archived conversations
-            const archivedRes = await axios.get(`/api/conversations?userId=${user.id}&includeArchived=true`);
-            const archivedList = Array.isArray(archivedRes.data) ? archivedRes.data : [];
-            const archivedMap = new Map(archivedList.map((c) => [c._id, c]));
+            const archivedRes = await axios.get(`/api/conversations?userId=${user?.id}&includeArchived=true`);
+            const archivedList = Array.isArray(archivedRes?.data) ? archivedRes.data : [];
+            const archivedMap = new Map(archivedList.map((c) => [c?._id, c]).filter(([id]) => id));
             setArchivedConversations(Array.from(archivedMap.values()));
         } catch (error) {
             alert("Failed to unarchive conversation");
         }
     };
 
-    const loadMoreMessages = async () => {
-        if (!selectedConv || isLoadingMoreMessages || !hasMoreMessages || selectedConv === "ai-chat") return;
-        
-        setIsLoadingMoreMessages(true);
-        try {
-            const currentSkip = messages.length;
-            await loadMessages(selectedConv, currentSkip);
-        } finally {
-            setIsLoadingMoreMessages(false);
-        }
-    };
 
     const handleLogout = async () => {
         setIsLoggingOut(true);
@@ -1021,7 +1117,6 @@ export default function ChatPage() {
     }
 
     // Find otherUser from either regular or archived conversations, or handle AI chat
-    let selectedConversation = null;
     let otherUser = null;
     let isOtherOnline = false;
     let otherUserId = null;
@@ -1049,7 +1144,7 @@ export default function ChatPage() {
         isOtherOnline = true; // AI is always "online"
         otherUserId = otherUser?._id || "ai-assistant";
     } else {
-        selectedConversation = conversations.find((c) => c?._id === selectedConv) 
+        const selectedConversation = conversations.find((c) => c?._id === selectedConv) 
             || archivedConversations.find((c) => c?._id === selectedConv);
         otherUser = selectedConversation?.participants?.find((p) => p?._id !== user?.id);
         isOtherOnline = otherUser ? onlineUsers.some((u) => u?.id === otherUser?._id) : false;
@@ -1093,7 +1188,6 @@ export default function ChatPage() {
                                             otherUserName={otherUser?.name}
                                             recvLang={recvLang}
                                             onRecvLangChange={saveRecvLang}
-                                            isTranslating={isTranslating}
                                             typingUsers={typingUsers}
                                             isOtherOnline={isOtherOnline}
                                             conversationId={selectedConv}
@@ -1134,6 +1228,9 @@ export default function ChatPage() {
                                         messagesEndRef={messagesEndRef}
                                         typingUsers={typingUsers}
                                         isAIGenerating={isAILoading && selectedConv === "ai-chat"}
+                                        currentUserId={user?.id}
+                                        onAddReaction={handleAddReaction}
+                                        onRemoveReaction={handleRemoveReaction}
                                     />
                                     )}
 
@@ -1150,6 +1247,8 @@ export default function ChatPage() {
                                             conversationId={selectedConv}
                                             user={user}
                                             isAIChat={selectedConv === "ai-chat"}
+                                            onVoiceMessage={handleVoiceMessage}
+                                            onLocationShare={handleLocationShare}
                                         />
                                     </div>
                                 </>
@@ -1191,7 +1290,6 @@ export default function ChatPage() {
                                         otherUserName={otherUser?.name}
                                         recvLang={recvLang}
                                         onRecvLangChange={saveRecvLang}
-                                        isTranslating={isTranslating}
                                         isOtherOnline={isOtherOnline}
                                         conversationId={selectedConv}
                                         otherUser={otherUser}
@@ -1229,6 +1327,9 @@ export default function ChatPage() {
                                         messagesEndRef={messagesEndRef}
                                         typingUsers={typingUsers}
                                         isAIGenerating={isAILoading && selectedConv === "ai-chat"}
+                                        currentUserId={user?.id}
+                                        onAddReaction={handleAddReaction}
+                                        onRemoveReaction={handleRemoveReaction}
                                     />
                                 )}
 
@@ -1245,6 +1346,8 @@ export default function ChatPage() {
                                         conversationId={selectedConv}
                                         user={user}
                                         isAIChat={selectedConv === "ai-chat"}
+                                        onVoiceMessage={handleVoiceMessage}
+                                        onLocationShare={handleLocationShare}
                                     />
                                 </div>
                             </>
@@ -1282,6 +1385,7 @@ export default function ChatPage() {
                         isIncoming={true}
                         incomingOffer={incomingCall.sdp}
                         isOutgoingCall={isOutgoingCall}
+                        callType={incomingCall.callType || "video"}
                     />
             )}
         </div>

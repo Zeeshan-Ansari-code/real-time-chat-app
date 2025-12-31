@@ -287,13 +287,24 @@ export default function ChatHeader({
           </div>
 
           {!isAIChat && (
-            <CallButton
-              conversationId={conversationId}
-              otherUser={otherUser}
-              user={user}
-              pusherRef={pusherRef}
-              onOutgoingCall={onOutgoingCall}
-            />
+            <div className="flex items-center gap-2">
+              <CallButton
+                conversationId={conversationId}
+                otherUser={otherUser}
+                user={user}
+                pusherRef={pusherRef}
+                onOutgoingCall={onOutgoingCall}
+                callType="voice"
+              />
+              <CallButton
+                conversationId={conversationId}
+                otherUser={otherUser}
+                user={user}
+                pusherRef={pusherRef}
+                onOutgoingCall={onOutgoingCall}
+                callType="video"
+              />
+            </div>
           )}
         </div>
       </div>

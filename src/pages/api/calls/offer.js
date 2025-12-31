@@ -4,7 +4,7 @@ import { pusher } from "@/lib/pusher";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { conversationId, from, to, sdp } = req.body;
+  const { conversationId, from, to, sdp, callType } = req.body;
   if (!conversationId || !from || !sdp) {
     return res.status(400).json({ error: "conversationId, from and sdp required" });
   }
@@ -15,6 +15,7 @@ export default async function handler(req, res) {
       from,
       to,
       sdp,
+      callType: callType || "video", // Default to video for backward compatibility
       ts: Date.now(),
     });
 

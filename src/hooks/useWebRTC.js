@@ -54,34 +54,44 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
     }
   };
 
-  async function startLocalStream(facingMode = "user", deviceId = null) {
+  async function startLocalStream(facingMode = "user", deviceId = null, isVoiceCall = false) {
     if (localStreamRef.current) return localStreamRef.current;
 
     try {
-      // Prefer deviceId if provided (more reliable on mobile)
-      const videoConstraints = deviceId
+      // For voice calls, only request audio
+      const mediaConstraints = isVoiceCall
         ? {
-            deviceId: { ideal: deviceId },
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            frameRate: { ideal: 30, min: 15 }
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: { ideal: 48000, min: 22050 }
+            }
           }
         : {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1280, min: 640 },
-            height: { ideal: 720, min: 480 },
-            frameRate: { ideal: 30, min: 15 }
+            // Prefer deviceId if provided (more reliable on mobile)
+            video: deviceId
+              ? {
+                  deviceId: { ideal: deviceId },
+                  width: { ideal: 1280, min: 640 },
+                  height: { ideal: 720, min: 480 },
+                  frameRate: { ideal: 30, min: 15 }
+                }
+              : {
+                  facingMode: { ideal: facingMode },
+                  width: { ideal: 1280, min: 640 },
+                  height: { ideal: 720, min: 480 },
+                  frameRate: { ideal: 30, min: 15 }
+                },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: { ideal: 48000, min: 22050 }
+            }
           };
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: { ideal: 48000, min: 22050 }
-        }
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
 
       localStreamRef.current = stream;
       return stream;
@@ -126,7 +136,7 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
     pendingCandidatesRef.current = [];
   }
 
-  async function createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, onRemoteStream, setStatus, facingMode = "user", deviceId = null) {
+  async function createPeerConnectionAndAttach(localVideoRef, remoteVideoRef, onRemoteStream, setStatus, facingMode = "user", deviceId = null, isVoiceCall = false) {
     try {
       const rtc = new RTCPeerConnection(CONFIG);
 
@@ -145,7 +155,7 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
       rtc.onsignalingstatechange = () => {};
       rtc.oniceconnectionstatechange = () => {};
 
-      const localStream = await startLocalStream(facingMode, deviceId);
+      const localStream = await startLocalStream(facingMode, deviceId, isVoiceCall);
       const tracks = localStream.getTracks();
 
       tracks.forEach((track) => {
@@ -154,7 +164,8 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
         } catch (error) {}
       });
 
-      if (localVideoRef?.current) {
+      // Only setup video element for video calls
+      if (!isVoiceCall && localVideoRef?.current) {
         videoUtils.setupVideoElement(localVideoRef.current, localStream, "Local");
       }
 
@@ -173,7 +184,9 @@ export function useWebRTC(conversationId, user, otherUser, setStatus = null) {
         remoteStream.addTrack(evt.track);
         window.currentRemoteStream = remoteStream;
 
-        if (remoteVideoRef?.current) {
+        // Only setup video element if it's a video call and we have a video track
+        const hasVideoTrack = remoteStream.getVideoTracks().length > 0;
+        if (hasVideoTrack && remoteVideoRef?.current) {
           remoteVideoRef.current.srcObject = remoteStream;
           remoteVideoRef.current.autoplay = true;
           remoteVideoRef.current.playsInline = true;

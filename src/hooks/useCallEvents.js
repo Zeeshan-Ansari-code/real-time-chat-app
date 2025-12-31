@@ -56,7 +56,8 @@ export function useCallEvents(
           setStatus("incoming");
           pcRef.current = {
             incomingOffer: payload.sdp,
-            from: payload.from
+            from: payload.from,
+            callType: payload.callType || "video" // Store call type from offer
           };
         };
 

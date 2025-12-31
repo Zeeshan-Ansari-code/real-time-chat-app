@@ -28,6 +28,7 @@ export default async function handler(req, res) {
       const messages = await Message.find({ conversation: conversationId })
         .populate("sender", "name email")
         .populate("seenBy", "name email")
+        .populate("reactions.userId", "name email")
         .sort({ createdAt: sortOrder })
         .limit(limit)
         .skip(skip)
@@ -52,10 +53,10 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { senderId, text, lang, fileType, fileUrl, fileName, fileSize } = req.body;
+      const { senderId, text, lang, fileType, fileUrl, fileName, fileSize, location } = req.body;
 
-      if (!senderId || (!text && !fileUrl)) {
-        return res.status(400).json({ error: "senderId and either text or fileUrl are required" });
+      if (!senderId || (!text && !fileUrl && !location)) {
+        return res.status(400).json({ error: "senderId and either text, fileUrl, or location are required" });
       }
 
       const newMessage = await Message.create({
@@ -68,6 +69,11 @@ export default async function handler(req, res) {
         fileUrl: fileUrl || null,
         fileName: fileName || null,
         fileSize: fileSize || null,
+        location: location ? {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: location.address || null,
+        } : undefined,
       });
 
       await newMessage.populate("sender", "name email");

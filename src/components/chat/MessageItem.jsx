@@ -1,6 +1,7 @@
 "use client";
-import { File, Image as ImageIcon, Video, Music } from "lucide-react";
+import { File, Image as ImageIcon, Video, Music, MapPin, Mic } from "lucide-react";
 import { useState } from "react";
+import MessageReactions from "./MessageReactions";
 
 export default function MessageItem({
   message,
@@ -12,7 +13,10 @@ export default function MessageItem({
   formatFileSize,
   otherUserId,
   isTranslatingMessage,
-  isDeletingMessage
+  isDeletingMessage,
+  currentUserId,
+  onAddReaction,
+  onRemoveReaction
 }) {
   const [imageError, setImageError] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -121,7 +125,7 @@ export default function MessageItem({
                 )}
               </div>
             )}
-            {message.fileType === 'audio' && (
+            {(message.fileType === 'audio' || message.fileType === 'voice') && (
               <div onClick={(e) => e.stopPropagation()}>
                 {!audioError ? (
                   <>
@@ -191,6 +195,32 @@ export default function MessageItem({
           </div>
         )}
 
+        {/* Location sharing */}
+        {message.location && message.location.latitude && message.location.longitude && (
+          <div className="mb-2 p-3 bg-white/20 dark:bg-gray-700/50 rounded-lg border border-white/30 dark:border-gray-600">
+            <div className="flex items-start gap-2">
+              <MapPin className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium mb-1">📍 Shared Location</p>
+                {message.location.address && (
+                  <p className="text-xs opacity-90 mb-2 break-words">
+                    {message.location.address}
+                  </p>
+                )}
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${message.location.latitude}&mlon=${message.location.longitude}&zoom=15`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-300 hover:text-blue-200 underline inline-block"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View on map
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Message text */}
         {message.text && (
           <p>
@@ -199,6 +229,16 @@ export default function MessageItem({
               <span className="ml-2 text-[10px] opacity-70">[{message.lang}]</span>
             )}
           </p>
+        )}
+
+        {/* Message reactions */}
+        {currentUserId && (
+          <MessageReactions
+            message={message}
+            currentUserId={currentUserId}
+            onAddReaction={onAddReaction}
+            onRemoveReaction={onRemoveReaction}
+          />
         )}
 
         {/* Message actions for selected messages */}
