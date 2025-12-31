@@ -21,9 +21,10 @@ export function useFileUpload() {
       formData.append('file', file);
 
       // Use axios with onUploadProgress for progress tracking
-      // Optimize timeout based on file size (smaller files = shorter timeout)
+      // Optimize timeout based on file size (Vercel Hobby plan has 10s limit)
       const fileSizeMB = file.size / (1024 * 1024);
-      const timeout = fileSizeMB < 1 ? 30000 : fileSizeMB < 5 ? 60000 : 90000; // 30s, 60s, or 90s
+      // Reduced timeouts for Vercel Hobby plan compatibility
+      const timeout = fileSizeMB < 1 ? 8000 : fileSizeMB < 5 ? 9000 : 9500; // 8s, 9s, or 9.5s
       
       const response = await axios.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

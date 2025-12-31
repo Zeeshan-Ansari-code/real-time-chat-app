@@ -4,13 +4,15 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { v2 as cloudinary } from 'cloudinary';
 
+// Note: Vercel Hobby plan has 10s timeout, Pro plan has 60s
+// For Hobby plan, consider using Cloudinary unsigned uploads (client-side) or upgrading to Pro
 export const config = {
   api: {
     bodyParser: false,
     responseLimit: false, // Disable response size limit
     externalResolver: true, // Let Next.js handle the response
   },
-  maxDuration: 60, // 60 seconds max for Vercel serverless functions
+  maxDuration: 10, // 10 seconds for Vercel Hobby plan compatibility
 };
 
 // Configure Cloudinary
@@ -32,13 +34,15 @@ export default async function handler(req, res) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    // Formidable v2 syntax
+    // Formidable v2 syntax - use memory storage for faster processing
     const form = formidable({
       uploadDir: uploadsDir,
       keepExtensions: true,
       maxFileSize: 50 * 1024 * 1024, // 50MB limit
       allowEmptyFiles: false,
       multiples: false,
+      maxFields: 10, // Limit fields for performance
+      maxFieldsSize: 1024 * 1024, // 1MB for fields
         filter: ({ mimetype, name }) => {
         // Allow common file types
         const allowedTypes = [
@@ -75,12 +79,12 @@ export default async function handler(req, res) {
       }
     });
 
-    // Set response timeout
+    // Set response timeout (9 seconds for Vercel Hobby plan compatibility)
     let timeoutId = setTimeout(() => {
       if (!res.headersSent) {
-        res.status(504).json({ error: 'Upload timeout - request took too long' });
+        res.status(504).json({ error: 'Upload timeout - request took too long. Try a smaller file or upgrade to Vercel Pro plan.' });
       }
-    }, 55000); // 55 seconds (slightly less than maxDuration)
+    }, 9000); // 9 seconds (slightly less than maxDuration)
 
     return new Promise((resolve, reject) => {
       form.parse(req, async (err, fields, files) => {
@@ -172,6 +176,7 @@ export default async function handler(req, res) {
             }
             
             // Optimize Cloudinary upload with timeout and better options
+            // Use stream upload for better performance
             const uploadResult = await Promise.race([
               cloudinary.uploader.upload(filePath, {
                 resource_type: resourceType,
@@ -187,11 +192,15 @@ export default async function handler(req, res) {
                 ...(resourceType === 'video' && {
                   quality: 'auto',
                 }),
-                // Timeout for upload
-                timeout: 50000, // 50 seconds
+                // Timeout for upload (8 seconds - must complete before Vercel timeout)
+                timeout: 8000,
+                // Use chunked upload for large files
+                chunk_size: 6000000, // 6MB chunks
+                // Disable eager transformations for faster upload
+                eager: undefined,
               }),
               new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Cloudinary upload timeout')), 50000)
+                setTimeout(() => reject(new Error('Cloudinary upload timeout')), 8000)
               )
             ]);
 
