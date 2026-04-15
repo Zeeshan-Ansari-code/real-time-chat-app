@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import { ArrowLeft, Mail, Calendar } from "lucide-react";
+import { uploadToCloudinary } from "@/utils/cloudinaryUpload";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [dark, setDark] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
@@ -75,6 +77,7 @@ export default function ProfilePage() {
   }
 
   const isOwnProfile = currentUser?.id === user?._id || currentUser?.id === user?.id;
+  const userIdValue = user?._id || user?.id;
 
   return (
     <div className={`${dark ? "dark" : ""} min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900`}>
@@ -95,14 +98,64 @@ export default function ProfilePage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 lg:p-8">
           {/* Avatar and Name */}
           <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-3xl sm:text-4xl shadow-lg mb-4">
-              {user?.name?.[0]?.toUpperCase() || "?"}
+            <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-3xl sm:text-4xl shadow-lg mb-4 overflow-hidden">
+              {user?.image ? (
+                <img src={user.image} alt={user?.name || "Profile"} className="w-full h-full object-cover" />
+              ) : (
+                user?.name?.[0]?.toUpperCase() || "?"
+              )}
             </div>
             <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{user.name || "Unknown User"}</h2>
             {isOwnProfile && (
               <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
                 You
               </span>
+            )}
+            {isOwnProfile && (
+              <div className="mt-4">
+                <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">
+                  {isUploadingImage ? "Uploading..." : "Upload Profile Photo"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploadingImage}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !userIdValue || !currentUser?.id) return;
+                      setIsUploadingImage(true);
+                      try {
+                        const uploaded = await uploadToCloudinary(file, "image");
+                        const updated = await axios.put(`/api/users/${userIdValue}`, {
+                          requesterId: currentUser.id,
+                          image: uploaded?.fileUrl || "",
+                        });
+
+                        setUser(updated.data);
+                        const existing = JSON.parse(localStorage.getItem("user") || "{}");
+                        localStorage.setItem(
+                          "user",
+                          JSON.stringify({
+                            ...existing,
+                            image: updated.data?.image || "",
+                            name: updated.data?.name || existing?.name,
+                          })
+                        );
+                        setCurrentUser((prev) =>
+                          prev
+                            ? { ...prev, image: updated.data?.image || prev.image, name: updated.data?.name || prev.name }
+                            : prev
+                        );
+                      } catch (_) {
+                        alert("Failed to update profile photo");
+                      } finally {
+                        setIsUploadingImage(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                </label>
+              </div>
             )}
           </div>
 

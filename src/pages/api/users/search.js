@@ -26,7 +26,7 @@ export default async function handler(req, res) {
         : { $text: { $search: searchQuery } };
       
       users = await User.find(textFilter)
-        .select("name email")
+        .select("name email image")
         .limit(10)
         .lean();
     } catch (textSearchError) {
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         : { $or: [{ name: regex }, { email: regex }] };
 
       users = await User.find(filter)
-        .select("name email")
+        .select("name email image")
         .limit(10)
         .lean();
     }

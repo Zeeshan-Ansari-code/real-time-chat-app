@@ -19,6 +19,8 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   const [availableCameras, setAvailableCameras] = useState([]);
   const [currentCameraId, setCurrentCameraId] = useState(null);
   const isVoiceCall = callType === "voice";
+  const ringtoneCtxRef = useRef(null);
+  const ringtoneIntervalRef = useRef(null);
 
   const {
     pcRef,
@@ -187,11 +189,73 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
 
   useEffect(() => () => cleanup(), []);
 
+  useEffect(() => {
+    const shouldRing = status === "incoming" && !isOutgoingCall;
+    if (!shouldRing) {
+      stopRingtone();
+      return;
+    }
+
+    startRingtone();
+    return () => stopRingtone();
+  }, [status, isOutgoingCall]);
+
   function cleanup() {
+    stopRingtone();
     cleanupWebRTC(localVideoRef, remoteVideoRef);
     setStatus("idle");
     setHasProcessedAnswer(false);
     setLocalStreamState(null);
+  }
+
+  function stopRingtone() {
+    if (ringtoneIntervalRef.current) {
+      clearInterval(ringtoneIntervalRef.current);
+      ringtoneIntervalRef.current = null;
+    }
+    if (ringtoneCtxRef.current) {
+      try {
+        ringtoneCtxRef.current.close();
+      } catch (_) {}
+      ringtoneCtxRef.current = null;
+    }
+  }
+
+  function startRingtone() {
+    if (ringtoneIntervalRef.current) return;
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const ctx = new AudioCtx();
+    ringtoneCtxRef.current = ctx;
+
+    const ringOnce = () => {
+      const now = ctx.currentTime;
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = "sine";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(880, now);
+      osc2.frequency.setValueAtTime(660, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now + 0.08);
+      osc1.stop(now + 0.9);
+      osc2.stop(now + 0.9);
+    };
+
+    ringOnce();
+    ringtoneIntervalRef.current = setInterval(ringOnce, 1800);
   }
 
       async function initiateCall() {

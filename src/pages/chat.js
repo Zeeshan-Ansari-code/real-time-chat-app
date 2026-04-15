@@ -60,6 +60,7 @@ export default function ChatPage() {
     const {
         recvLang,
         setRecvLang,
+        isTranslating,
         recvLangRef,
         translateCacheRef
     } = useTranslation(selectedConv, messages, setMessages);
@@ -737,7 +738,33 @@ export default function ChatPage() {
                                         setConversations(convs?.data || []);
                                     } catch (_) {}
                                 } else if (data.type === 'error') {
-                                    throw new Error(data.error || 'AI error');
+                                    // Server may send a saved fallback AI message, or only an error string
+                                    if (data.message && typeof data.message === 'object' && data.message.text) {
+                                        setMessages((prev) => {
+                                            const filtered = prev.filter((m) => m._id !== tempAiMessageId);
+                                            return [...filtered, data.message];
+                                        });
+                                        if (data.message?.conversation) {
+                                            setAiConversationId(data.message.conversation);
+                                        }
+                                        try {
+                                            const convs = await axios.get(
+                                                `/api/conversations?userId=${user?.id}`
+                                            );
+                                            setConversations(convs?.data || []);
+                                        } catch (_) {}
+                                    } else {
+                                        setMessages((prev) =>
+                                            prev.filter(
+                                                (m) => m._id !== tempAiMessageId && m._id !== tempUserMessage._id
+                                            )
+                                        );
+                                        alert(
+                                            data.error ||
+                                                data.details ||
+                                                'AI service error. Check that your Hugging Face token has Inference Providers access and try another model (e.g. openai/gpt-oss-20b).'
+                                        );
+                                    }
                                 }
                             } catch (e) {
                                 console.error('Error parsing SSE:', e);
@@ -1194,6 +1221,7 @@ export default function ChatPage() {
                                             otherUserName={otherUser?.name}
                                             recvLang={recvLang}
                                             onRecvLangChange={saveRecvLang}
+                                            isTranslating={isTranslating}
                                             typingUsers={typingUsers}
                                             isOtherOnline={isOtherOnline}
                                             conversationId={selectedConv}
@@ -1296,6 +1324,7 @@ export default function ChatPage() {
                                         otherUserName={otherUser?.name}
                                         recvLang={recvLang}
                                         onRecvLangChange={saveRecvLang}
+                                        isTranslating={isTranslating}
                                         isOtherOnline={isOtherOnline}
                                         conversationId={selectedConv}
                                         otherUser={otherUser}
@@ -1369,6 +1398,7 @@ export default function ChatPage() {
             <TranslationModal
                 message={selectedMessageForTranslation}
                 onTranslate={translateSelectedMessage}
+                isTranslating={isTranslatingMessage}
                 onClose={() => setSelectedMessageForTranslation(null)}
             />
 

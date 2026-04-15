@@ -1,5 +1,5 @@
 "use client";
-import { Sun, Moon, Search, Archive, X } from "lucide-react";
+import { Sun, Moon, Search, Archive, X, MessageCircle } from "lucide-react";
 import { useState } from "react";
 
 export default function Sidebar({
@@ -29,7 +29,7 @@ export default function Sidebar({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">C</span>
+              <MessageCircle className="w-5 h-5 text-white" />
             </div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">Chats</h3>
           </div>
@@ -85,7 +85,16 @@ export default function Sidebar({
                 onClick={() => onStartConversation(u._id)}
                 className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/10 flex items-center justify-between transition-all duration-200 group"
               >
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400">{u.name}</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
+                  {u?.image ? (
+                    <img src={u.image} alt={u?.name || "User"} className="w-7 h-7 rounded-full object-cover" />
+                  ) : (
+                    <span className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-xs font-bold inline-flex items-center justify-center">
+                      {(u?.name?.[0] || "?").toUpperCase()}
+                    </span>
+                  )}
+                  {u.name}
+                </span>
                 <span className="text-xs px-2.5 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full font-medium">Start chat</span>
               </button>
             ))}
@@ -190,7 +199,11 @@ export default function Sidebar({
                           ? "bg-gradient-to-br from-blue-500 to-blue-600" 
                           : "bg-gradient-to-br from-blue-500 to-blue-600 opacity-80 group-hover:opacity-100"
                       } transition-all duration-200`}>
-                        {otherUser?.name?.[0] || "?"}
+                        {otherUser?.image ? (
+                          <img src={otherUser.image} alt={otherUser?.name || "User"} className="w-full h-full rounded-xl object-cover" />
+                        ) : (
+                          otherUser?.name?.[0] || "?"
+                        )}
                       </div>
                       {isOnline && (
                         <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 shadow-md" />
@@ -280,7 +293,11 @@ export default function Sidebar({
                       >
                         <div className="relative w-10 h-10 flex-shrink-0">
                           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center text-white font-bold text-sm shadow-md opacity-75">
-                            {otherUser?.name?.[0] || "?"}
+                            {otherUser?.image ? (
+                              <img src={otherUser.image} alt={otherUser?.name || "User"} className="w-full h-full rounded-xl object-cover" />
+                            ) : (
+                              otherUser?.name?.[0] || "?"
+                            )}
                           </div>
                           {isOnline && (
                             <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900 shadow-md" />
@@ -326,15 +343,28 @@ export default function Sidebar({
         className="sticky bottom-0 z-20 p-4 border-t border-gray-100 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur mt-auto pb-6"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
-        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 dark:border-gray-800">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md">
-            {user?.name?.[0] || "U"}
+        <button
+          type="button"
+          onClick={() => {
+            if (user?.id) {
+              window.location.href = `/profile/${user.id}`;
+            }
+          }}
+          className="w-full flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 dark:border-gray-800 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 rounded-lg p-2 -m-2 transition-colors"
+          title="Open your profile"
+        >
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold shadow-md overflow-hidden">
+            {user?.image ? (
+              <img src={user.image} alt={user?.name || "User"} className="w-full h-full object-cover" />
+            ) : (
+              user?.name?.[0] || "U"
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user?.name || "User"}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email || ""}</p>
           </div>
-        </div>
+        </button>
         <button
           onClick={onLogout}
           disabled={isLoggingOut}

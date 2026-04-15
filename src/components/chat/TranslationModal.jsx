@@ -1,6 +1,9 @@
 "use client";
 
-export default function TranslationModal({ message, onTranslate, onClose }) {
+import { useState } from "react";
+
+export default function TranslationModal({ message, onTranslate, onClose, isTranslating = false }) {
+  const [selectedLang, setSelectedLang] = useState("");
   if (!message) return null;
 
   return (
@@ -12,9 +15,13 @@ export default function TranslationModal({ message, onTranslate, onClose }) {
         </p>
         <div className="space-y-3">
           <select
-            onChange={(e) => {
-              if (e.target.value) {
-                onTranslate(message._id, e.target.value);
+            value={selectedLang}
+            disabled={isTranslating}
+            onChange={async (e) => {
+              const nextLang = e.target.value;
+              setSelectedLang(nextLang);
+              if (nextLang) {
+                await onTranslate(message._id, nextLang);
                 onClose();
               }
             }}
@@ -31,10 +38,17 @@ export default function TranslationModal({ message, onTranslate, onClose }) {
             <option value="zh">Chinese</option>
             <option value="ar">Arabic</option>
           </select>
+          {isTranslating && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-300">
+              <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></div>
+              Translating message...
+            </div>
+          )}
         </div>
         <div className="flex gap-2 mt-6">
           <button
             onClick={onClose}
+            disabled={isTranslating}
             className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             Cancel

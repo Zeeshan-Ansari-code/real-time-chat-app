@@ -85,41 +85,66 @@ export default async function handler(req, res) {
       content: message,
     });
 
-    // Call Hugging Face API
     const huggingFaceApiKey = process.env.HUGGINGFACE_API_KEY;
-    const huggingFaceModel = process.env.HUGGINGFACE_MODEL || "deepseek-ai/DeepSeek-V3.2";
+    const DEFAULT_ROUTER_MODEL = "openai/gpt-oss-20b";
+    const envModel = process.env.HUGGINGFACE_MODEL;
+    const modelsToTry = [...new Set([envModel || DEFAULT_ROUTER_MODEL, DEFAULT_ROUTER_MODEL])];
 
     if (!huggingFaceApiKey) {
       return res.status(500).json({ error: "Hugging Face API key not configured" });
     }
 
     try {
-      // Format messages for Hugging Face API
       const messages = messageHistory.map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      const response = await axios.post(
-        `https://router.huggingface.co/v1/chat/completions`,
-        {
-          model: huggingFaceModel,
-          messages: messages,
-          max_tokens: 1000,
-          temperature: 0.7,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${huggingFaceApiKey}`,
-            "Content-Type": "application/json",
-          },
-          timeout: 30000, // 30 seconds timeout
-        }
-      );
+      let aiResponse = "";
+      let lastHfError = null;
 
-      const aiResponse = response.data?.choices?.[0]?.message?.content || 
-                        response.data?.generated_text || 
-                        "I'm sorry, I couldn't generate a response. Please try again.";
+      for (const model of modelsToTry) {
+        try {
+          const response = await axios.post(
+            `https://router.huggingface.co/v1/chat/completions`,
+            {
+              model,
+              messages,
+              max_tokens: 1000,
+              temperature: 0.7,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${huggingFaceApiKey}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 90000,
+            }
+          );
+
+          aiResponse =
+            response.data?.choices?.[0]?.message?.content ||
+            response.data?.generated_text ||
+            "";
+          if (response.data?.error) {
+            throw new Error(
+              response.data.error.message || JSON.stringify(response.data.error)
+            );
+          }
+          if (aiResponse?.trim()) break;
+        } catch (e) {
+          lastHfError = e;
+          console.error(`[chat] HF failed for ${model}:`, e.response?.data || e.message);
+        }
+      }
+
+      if (!aiResponse?.trim()) {
+        aiResponse =
+          "I'm sorry, I couldn't generate a response. Please try again." +
+          (lastHfError?.response?.data
+            ? ` (${JSON.stringify(lastHfError.response.data).slice(0, 200)})`
+            : "");
+      }
 
       // Save AI response as message
       const aiMessage = await Message.create({

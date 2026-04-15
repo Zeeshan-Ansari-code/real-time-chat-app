@@ -2,6 +2,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/router";
+import { uploadToCloudinary } from "@/utils/cloudinaryUpload";
 
 export default function SignupPage() {
     const router = useRouter();
@@ -11,13 +12,21 @@ export default function SignupPage() {
     const [error, setError] = useState("");
     const [dark, setDark] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [profileImage, setProfileImage] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState("");
 
     const handleSignup = async (e) => {
         e.preventDefault();
         setError("");
         setIsLoading(true);
         try {
-            await axios.post("/api/auth/signup", { name, email, password });
+            let image = "";
+            if (profileImage) {
+                const uploaded = await uploadToCloudinary(profileImage, "image");
+                image = uploaded?.fileUrl || "";
+            }
+
+            await axios.post("/api/auth/signup", { name, email, password, image });
             // Auto-login after signup
             const loginRes = await axios.post("/api/auth/login", { email, password });
             localStorage.setItem("user", JSON.stringify(loginRes.data));
@@ -92,6 +101,36 @@ export default function SignupPage() {
                     required
                     className="px-6 py-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all duration-200 shadow-sm hover:shadow-md"
                 />
+
+                <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Profile Photo (optional)
+                    </label>
+                    <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                            {previewUrl ? (
+                                <img src={previewUrl} alt="Profile preview" className="w-full h-full object-cover" />
+                            ) : (
+                                (name?.[0] || "?").toUpperCase()
+                            )}
+                        </div>
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) {
+                                    setProfileImage(null);
+                                    setPreviewUrl("");
+                                    return;
+                                }
+                                setProfileImage(file);
+                                setPreviewUrl(URL.createObjectURL(file));
+                            }}
+                            className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-100 dark:file:bg-blue-900/40 file:text-blue-700 dark:file:text-blue-300 file:font-medium"
+                        />
+                    </div>
+                </div>
 
                 <button
                     type="submit"

@@ -65,7 +65,8 @@ export default async function handler(req, res) {
               participants: {
                 _id: 1,
                 name: 1,
-                email: 1
+                email: 1,
+                image: 1
               },
               createdAt: 1,
               updatedAt: 1
@@ -85,7 +86,7 @@ export default async function handler(req, res) {
         }
         
         conversations = await Conversation.find(query)
-          .populate("participants", "name email")
+          .populate("participants", "name email image")
           .lean();
       }
 
