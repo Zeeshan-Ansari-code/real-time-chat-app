@@ -186,8 +186,11 @@ export function useCallEvents(
           }
         };
 
-        const onHangupHandler = () => {
-          onHangupRef.current?.();
+        const onHangupHandler = (payload) => {
+          if (String(payload?.from?.id || payload?.from?._id) === String(user.id)) {
+            return;
+          }
+          onHangupRef.current?.(payload || {});
         };
 
         channel.bind("call:offer", onOffer);

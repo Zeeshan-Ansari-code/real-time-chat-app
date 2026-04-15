@@ -18,6 +18,9 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   const [facingMode, setFacingMode] = useState("user"); // "user" = front, "environment" = back
   const [availableCameras, setAvailableCameras] = useState([]);
   const [currentCameraId, setCurrentCameraId] = useState(null);
+  const [callStartedAt, setCallStartedAt] = useState(null);
+  const [callDurationSec, setCallDurationSec] = useState(0);
+  const [callInfoText, setCallInfoText] = useState("");
   const isVoiceCall = callType === "voice";
   const ringtoneCtxRef = useRef(null);
   const ringtoneIntervalRef = useRef(null);
@@ -66,9 +69,22 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     pendingCandidatesRef,
     setHasProcessedAnswer,
     hasProcessedAnswer,
-    () => {
-      cleanupRef.current();
-      onCloseRef.current?.();
+    (payload) => {
+      const reason = payload?.reason || "hangup";
+      const duration = Number(payload?.durationSec || 0);
+      if (reason === "rejected") {
+        setCallInfoText(`${otherUser?.name || "User"} declined the call`);
+        setStatus("declined");
+        stopRingtone();
+        return;
+      }
+
+      if (duration > 0) {
+        setCallDurationSec(duration);
+      }
+      setCallInfoText(duration > 0 ? `Call ended • ${formatDuration(duration)}` : "Call ended");
+      setStatus("ended");
+      stopRingtone();
     }
   );
 
@@ -190,6 +206,20 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   useEffect(() => () => cleanup(), []);
 
   useEffect(() => {
+    if (status !== "in-call") return;
+    if (!callStartedAt) {
+      setCallStartedAt(Date.now());
+      return;
+    }
+
+    const id = setInterval(() => {
+      setCallDurationSec(Math.floor((Date.now() - callStartedAt) / 1000));
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [status, callStartedAt]);
+
+  useEffect(() => {
     const shouldRing = status === "incoming" && !isOutgoingCall;
     if (!shouldRing) {
       stopRingtone();
@@ -206,6 +236,9 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
     setStatus("idle");
     setHasProcessedAnswer(false);
     setLocalStreamState(null);
+    setCallStartedAt(null);
+    setCallDurationSec(0);
+    setCallInfoText("");
   }
 
   function stopRingtone() {
@@ -241,7 +274,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
       osc2.frequency.setValueAtTime(660, now);
 
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
 
       osc1.connect(gain);
@@ -371,9 +404,10 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
       from: user,
       to: pcRef.current?.from || otherUser || null,
       reason: "rejected",
+      callType,
     }).catch(() => { });
-    cleanup();
-    onClose?.();
+    setCallInfoText("Call declined");
+    setStatus("declined");
   }
 
   async function leaveCall() {
@@ -382,9 +416,17 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
       from: user,
       to: otherUser,
       reason: "left",
+      callType,
+      durationSec: callDurationSec,
     }).catch(() => { });
     cleanup();
     onClose?.();
+  }
+
+  function formatDuration(totalSec) {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }
 
   function toggleMute() {
@@ -612,6 +654,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
                     {status === "connecting" && "Connecting..."}
                     {status === "ringing" && "Ringing..."}
                     {status === "in-call" && !remoteVideoRef.current?.srcObject && "Waiting for video..."}
+                    {status === "in-call" && callDurationSec > 0 && ` • ${formatDuration(callDurationSec)}`}
                   </p>
                 </div>
               </div>
@@ -644,7 +687,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
               <p className="text-green-200 text-sm">
                 {status === "connecting" && "Connecting..."}
                 {status === "ringing" && "Ringing..."}
-                {status === "in-call" && "Voice Call"}
+                {status === "in-call" && `Voice Call • ${formatDuration(callDurationSec)}`}
               </p>
             </div>
           </div>
@@ -656,7 +699,9 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
           <span className="text-white text-sm font-medium">
             {status === "connecting" && "Connecting..."}
             {status === "ringing" && "Ringing..."}
-            {status === "in-call" && "Connected"}
+            {status === "in-call" && `Connected • ${formatDuration(callDurationSec)}`}
+            {status === "declined" && "Call declined"}
+            {status === "ended" && (callInfoText || "Call ended")}
           </span>
         </div>
 
@@ -677,7 +722,14 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
               status={status}
               isMuted={isMuted}
               onMute={toggleMute}
-              onHangup={leaveCall}
+                  onHangup={() => {
+                    if (status === "declined" || status === "ended") {
+                      cleanup();
+                      onClose?.();
+                    } else {
+                      leaveCall();
+                    }
+                  }}
               onStartCall={initiateCall}
               isIncoming={isIncoming}
               onAccept={acceptCall}
@@ -685,6 +737,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
               onSwitchCamera={switchCamera}
               canSwitchCamera={!isVoiceCall && status === "in-call" && pcRef.current?.rtc !== null && availableCameras.length >= 2}
               callType={callType}
+                  callInfoText={callInfoText}
             />
           </div>
         </div>
@@ -768,7 +821,14 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
                   status={status}
                   isMuted={isMuted}
                   onMute={toggleMute}
-                  onHangup={leaveCall}
+                  onHangup={() => {
+                    if (status === "declined" || status === "ended") {
+                      cleanup();
+                      onClose?.();
+                    } else {
+                      leaveCall();
+                    }
+                  }}
                   onStartCall={initiateCall}
                   isIncoming={isIncoming}
                   onAccept={acceptCall}
@@ -776,6 +836,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
                   onSwitchCamera={switchCamera}
                   canSwitchCamera={!isVoiceCall && status === "idle" && localStreamRef.current !== null && availableCameras.length >= 2}
                   callType={callType}
+                  callInfoText={callInfoText}
                 />
               </div>
             </>

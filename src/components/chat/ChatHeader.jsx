@@ -91,6 +91,13 @@ export default function ChatHeader({
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold flex items-center justify-center overflow-hidden shadow-sm">
+              {otherUser?.image ? (
+                <img src={otherUser.image} alt={otherUserName || "User"} className="w-full h-full object-cover" />
+              ) : (
+                (otherUserName?.[0] || "?").toUpperCase()
+              )}
+            </div>
             <h2 className="font-bold text-gray-900 dark:text-white text-xl lg:text-2xl truncate">
               {otherUserName || "Unknown User"}
             </h2>

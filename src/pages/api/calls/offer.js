@@ -1,5 +1,8 @@
 // /pages/api/calls/offer.js
 import { pusher } from "@/lib/pusher";
+import { connectDB } from "@/lib/mongoose";
+import Message from "@/models/Message";
+import Conversation from "@/models/Conversation";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
@@ -10,6 +13,29 @@ export default async function handler(req, res) {
   }
 
   try {
+    const senderId = from?.id || from?._id || null;
+    await connectDB();
+
+    if (senderId) {
+      const callLabel = callType === "voice" ? "Voice" : "Video";
+      const callMessage = await Message.create({
+        conversation: conversationId,
+        sender: senderId,
+        text: `📞 ${callLabel} call started`,
+        lang: null,
+        seenBy: [senderId],
+      });
+      await callMessage.populate("sender", "name email image");
+      await pusher.trigger(`conversation-${conversationId}`, "new-message", callMessage);
+
+      const conv = await Conversation.findById(conversationId).lean();
+      if (conv?.participants?.length) {
+        for (const participantId of conv.participants) {
+          await pusher.trigger(`user-${participantId}`, "conversation-upsert", { conversationId });
+        }
+      }
+    }
+
     // send the offer to the conversation channel
     await pusher.trigger(`presence-conversation-${conversationId}`, "call:offer", {
       from,

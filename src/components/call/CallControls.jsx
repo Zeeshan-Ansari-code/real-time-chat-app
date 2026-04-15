@@ -1,6 +1,6 @@
 "use client";
 
-export default function CallControls({ status, isMuted, onMute, onHangup, onStartCall, isIncoming, onAccept, onReject, otherUser, onSwitchCamera, canSwitchCamera = false, callType = "video" }) {
+export default function CallControls({ status, isMuted, onMute, onHangup, onStartCall, isIncoming, onAccept, onReject, otherUser, onSwitchCamera, canSwitchCamera = false, callType = "video", callInfoText = "" }) {
   const isVoiceCall = callType === "voice";
   if (status === "incoming" && isIncoming) {
     return (
@@ -108,6 +108,23 @@ export default function CallControls({ status, isMuted, onMute, onHangup, onStar
         </svg>
         Cancel Call
       </button>
+    );
+  }
+
+  if (status === "declined" || status === "ended") {
+    return (
+      <div className="flex flex-col items-center gap-4">
+        <p className="text-sm text-gray-600 dark:text-gray-300">{callInfoText || (status === "declined" ? "Call declined" : "Call ended")}</p>
+        <button
+          onClick={onHangup}
+          className="px-6 py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl hover:from-red-600 hover:to-pink-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Close
+        </button>
+      </div>
     );
   }
 
