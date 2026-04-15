@@ -764,7 +764,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-6 overflow-y-auto">
-      <audio ref={ringtoneAudioRef} src="/sounds/ringtone.ogg" preload="auto" />
+      <audio ref={ringtoneAudioRef} src="/sounds/call-ringtone.mp3" preload="auto" />
       <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-auto border border-gray-200 dark:border-gray-700 ${isIncomingCallModal ? 'animate-pulse' : ''}`}>
         {/* Header - Only show for non-incoming calls */}
         {!isIncomingCallModal && (
