@@ -193,11 +193,19 @@ export function useCallEvents(
           onHangupRef.current?.(payload || {});
         };
 
+        const onDeclined = (payload) => {
+          if (String(payload?.from?.id || payload?.from?._id) === String(user.id)) {
+            return;
+          }
+          onHangupRef.current?.({ ...(payload || {}), reason: "rejected" });
+        };
+
         channel.bind("call:offer", onOffer);
         channel.bind("call:ring", onRing);
         channel.bind("call:answer", onAnswer);
         channel.bind("call:ice", onIce);
         channel.bind("call:hangup", onHangupHandler);
+        channel.bind("call:declined", onDeclined);
 
         return () => {
           try {
@@ -206,6 +214,7 @@ export function useCallEvents(
             channel.unbind("call:answer", onAnswer);
             channel.unbind("call:ice", onIce);
             channel.unbind("call:hangup", onHangupHandler);
+            channel.unbind("call:declined", onDeclined);
             pusher.unsubscribe(channelName);
           } catch (error) {}
         };

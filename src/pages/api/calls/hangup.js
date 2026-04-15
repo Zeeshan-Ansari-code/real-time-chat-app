@@ -52,6 +52,14 @@ export default async function handler(req, res) {
       durationSec: Number(durationSec) || 0,
       ts: Date.now(),
     });
+    if ((reason || "hangup") === "rejected") {
+      await pusher.trigger(`presence-conversation-${conversationId}`, "call:declined", {
+        from,
+        to,
+        reason: "rejected",
+        ts: Date.now(),
+      });
+    }
     return res.status(200).json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: "failed to send hangup" });

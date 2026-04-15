@@ -22,6 +22,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   const [callDurationSec, setCallDurationSec] = useState(0);
   const [callInfoText, setCallInfoText] = useState("");
   const isVoiceCall = callType === "voice";
+  const ringtoneAudioRef = useRef(null);
   const ringtoneCtxRef = useRef(null);
   const ringtoneIntervalRef = useRef(null);
 
@@ -242,6 +243,12 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   }
 
   function stopRingtone() {
+    if (ringtoneAudioRef.current) {
+      try {
+        ringtoneAudioRef.current.pause();
+        ringtoneAudioRef.current.currentTime = 0;
+      } catch (_) {}
+    }
     if (ringtoneIntervalRef.current) {
       clearInterval(ringtoneIntervalRef.current);
       ringtoneIntervalRef.current = null;
@@ -255,6 +262,13 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   }
 
   function startRingtone() {
+    if (ringtoneAudioRef.current) {
+      ringtoneAudioRef.current.loop = true;
+      ringtoneAudioRef.current.volume = 1;
+      ringtoneAudioRef.current.play().catch(() => {});
+      return;
+    }
+
     if (ringtoneIntervalRef.current) return;
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -750,6 +764,7 @@ export default function CallModal({ conversationId, otherUser, user, onClose, pu
   
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-6 overflow-y-auto">
+      <audio ref={ringtoneAudioRef} src="/sounds/ringtone.ogg" preload="auto" />
       <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-auto border border-gray-200 dark:border-gray-700 ${isIncomingCallModal ? 'animate-pulse' : ''}`}>
         {/* Header - Only show for non-incoming calls */}
         {!isIncomingCallModal && (
